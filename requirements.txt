@@ -1,0 +1,4 @@
+#  // run virtual enviroment "source venv/bin/activate"
+# // run server:  "uvicorn app:app --reload"
+# // run migrations: "alembic upgrade head"
+#  // create migration alembic revision -m "create_users_table"
