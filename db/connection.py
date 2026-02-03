@@ -1,24 +1,24 @@
-import mysql.connector
-from mysql.connector import Error
 from config.db_config import DB_CONFIG
+import psycopg2
+from psycopg2 import Error
 print("Pachet mysql-connector este vizibil!")
 
 def get_connection():
     try:
-        conn = mysql.connector.connect(
+        conn = psycopg2.connect(
             host=DB_CONFIG["host"],
             user=DB_CONFIG["user"],
             password=DB_CONFIG["password"],
-            database=DB_CONFIG["database"]
+            dbname=DB_CONFIG["database"],
+            port=DB_CONFIG.get("port", 5432)
         )
-        if conn.is_connected():
-            print("Conexiune la baza de date MySQL realizata cu succes!")
-            return conn
+        print("Conexiune la PostgreSQL realizată cu succes!")
+        return conn
     except Error as e:
-        print(f"Error while connecting to MySQL: {e}")
+        print(f"Eroare la conectarea PostgreSQL: {e}")
         return None
 
 def close_connection(conn):
-    if conn and conn.is_connected():
+    if conn:
         conn.close()
-        print("Conexiunea la baza de date MySQL a fost inchisa.")
+        print("Conexiunea PostgreSQL a fost închisă.")

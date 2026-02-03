@@ -1,6 +1,7 @@
 DB_CONFIG = {
     "host": "localhost",
-    "user": "root",
+    "user": "postgres",
     "password": "",
-    "database": "python"
+    "database": "python_postgress",
+    "port": 5432
 }
