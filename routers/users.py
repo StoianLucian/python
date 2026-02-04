@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from schemas.user import UserCreate, UserRead
+from schemas.user_schemas import UserCreate, UserRead
 from helpers.helpers import raise_error
 
 from errors import UserErrorCode

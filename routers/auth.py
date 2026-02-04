@@ -5,11 +5,11 @@ from pydantic import BaseModel
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-class UserData(BaseModel):
-    username: str
+class LoginRequest(BaseModel):
+    account: str
     password: str
 
 @router.post("/login")
-def login_user(userData: UserData):
-    return login_user_db(userData)
+def login_user(loginData: LoginRequest):
+    return login_user_db(loginData)
     

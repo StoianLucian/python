@@ -4,9 +4,9 @@ from context.context_manager import db_cursor
 from datetime import datetime, timedelta, timezone
 
 
-def login_user_db(userInfo):
+def login_user_db(loginData):
     with db_cursor() as (_, cursor):
-        cursor.execute(LOGIN_USER, (userInfo.username,))
+        cursor.execute(LOGIN_USER, (loginData.account, loginData.account,))
         
         user = cursor.fetchone()
         if user is None:
