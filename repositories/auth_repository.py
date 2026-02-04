@@ -1,36 +1,47 @@
+from fastapi import HTTPException, Response
+from pydantic import BaseModel
+from services.security import create_jwt, verify_password
 from sql import LOGIN_USER
-import jwt
 from context.context_manager import db_cursor
 from datetime import datetime, timedelta, timezone
 
+class LoginRequest(BaseModel):
+    account: str
+    password: str
 
-def login_user_db(loginData):
+def login_user_db(loginData: LoginRequest, response: Response):
     with db_cursor() as (_, cursor):
-        cursor.execute(LOGIN_USER, (loginData.account, loginData.account,))
-        
+        cursor.execute(LOGIN_USER, (loginData.account, loginData.account))
         user = cursor.fetchone()
-        if user is None:
-            raise {"message": "user not found"}
-        return user
-    
-SECRET_KEY = "your_secret_key_here"
-ALGORITHM = "HS256"
-    
-def create_jwt(user_id: int) -> str:
-    payload = {
-        "user_id": user_id,
-        "iat": datetime.now(tz=timezone.utc),
-        "exp": datetime.now(tz=timezone.utc) + timedelta(minutes=15)
-    }
-    
-    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-    return token
 
-def verify_jwt(token: str) -> dict:
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
-    except jwt.ExpiredSignatureError:
-        raise {"message": "Token has expired"}
-    except jwt.InvalidTokenError:
-        raise {"message": "Invalid token"}
+        if user is None:
+                   raise HTTPException(
+                status_code=404,
+                detail={
+                    "message": "User not found",
+                    "errorCode": "user_not_found"
+                })
+
+        
+        passwordCheck = verify_password(loginData.password, user.password)
+
+        if passwordCheck is False:
+                   raise HTTPException(
+                status_code=404,
+                detail={
+                    "message": "User not found",
+                    "errorCode": "user_not_found"
+                })
+       
+        token = create_jwt(user.id)
+
+        response.set_cookie(
+            key="access_token",
+            value=token,
+            httponly=True,
+            secure=True,      # HTTPS only
+            samesite="Lax",   # or "Strict" / "None"
+            max_age=3600
+        )
+        
+        return user
