@@ -3,8 +3,8 @@ import psycopg2.extras
 from db.connection import get_connection
 
 @contextmanager
-def db_cursor(cursor_type="namedtuple"):
-    conn = get_connection()
+def db_cursor(main_db = True,cursor_type="namedtuple"):
+    conn = get_connection(main_db)
     if not conn:
         raise Exception("Nu s-a putut crea conexiunea la DB")
 
