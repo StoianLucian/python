@@ -1,12 +1,15 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from schemas.user_schemas import UserCreate, UserRead
 from helpers.helpers import raise_error
 
 from errors import UserErrorCode
 from repositories import *
 
+router = APIRouter(
+    prefix="/users",
+    tags=["users"],
 
-router = APIRouter(prefix="/users", tags=["users"])
+)
 
 @router.post("/")
 def create_user(user: UserCreate):
@@ -25,7 +28,7 @@ def get_all_users():
         raise HTTPException(status_code=500, detail=str(e))
     
 @router.get("/{id}")
-def get_user_by_id(id):
+def get_user_by_id(id, user=Depends(check_token)):
     try:
         user = get_user_by_id_db(id)
         return user
@@ -34,7 +37,7 @@ def get_user_by_id(id):
 
     
 @router.delete("/{id}")
-def delete_user_by_id(id: int):
+def delete_user_by_id(id: int, user=Depends(check_token)):
     try:
         success = delete_user_by_id_db(id)
         if not success:

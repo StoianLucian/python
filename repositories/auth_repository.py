@@ -1,9 +1,8 @@
-from fastapi import HTTPException, Response
+from fastapi import HTTPException, Request, Response, status
 from pydantic import BaseModel
 from services.security import create_jwt, verify_password
 from sql import LOGIN_USER
 from context.context_manager import db_cursor
-from datetime import datetime, timedelta, timezone
 
 class LoginRequest(BaseModel):
     account: str
@@ -16,7 +15,7 @@ def login_user_db(loginData: LoginRequest, response: Response):
 
         if user is None:
                    raise HTTPException(
-                status_code=404,
+                status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "message": "User not found",
                     "errorCode": "user_not_found"
@@ -27,7 +26,7 @@ def login_user_db(loginData: LoginRequest, response: Response):
 
         if passwordCheck is False:
                    raise HTTPException(
-                status_code=404,
+                status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "message": "User not found",
                     "errorCode": "user_not_found"
@@ -45,3 +44,14 @@ def login_user_db(loginData: LoginRequest, response: Response):
         )
         
         return user
+    
+def check_token(request: Request):
+    token = request.cookies.get("access_token")
+    
+    if token is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "message": "Your are not authorized",
+                "errorCode": "not_authorized"
+            })
