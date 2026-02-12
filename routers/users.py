@@ -20,7 +20,7 @@ def create_user(user: UserCreate):
         raise HTTPException(status_code=500, detail=str(e))
     
 @router.get("/", response_model=list[UserRead])
-def get_all_users():
+def get_all_users(user=Depends(check_token)):
     try: 
         users = get_all_users_db()
         return users

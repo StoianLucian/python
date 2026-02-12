@@ -1,10 +1,14 @@
 from datetime import datetime, timedelta, timezone
-import bcrypt
+from fastapi import HTTPException, status
+from jwt import ExpiredSignatureError, InvalidTokenError
+from dotenv import load_dotenv
+import os
 import jwt
+import bcrypt
 
-    
-SECRET_KEY = "your_secret_key_here"
-ALGORITHM = "HS256"
+load_dotenv()
+JWT_SECRET = os.getenv("JWT_SECRET")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM")
 
 def hash_password(password):
     salt = bcrypt.gensalt()
@@ -38,16 +42,29 @@ def create_jwt(user_id: int) -> str:
         "iat": datetime.now(tz=timezone.utc),
         "exp": datetime.now(tz=timezone.utc) + timedelta(minutes=15)
     }
-    
-    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+    token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
     return token
 
 def verify_jwt(token: str) -> dict:
+    print(JWT_SECRET, JWT_ALGORITHM)
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         return payload
-    except jwt.ExpiredSignatureError:
-        raise {"message": "Token has expired"}
-    except jwt.InvalidTokenError:
-        raise {"message": "Invalid token"}
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "message": "Token expired",
+                "errorCode": "token_expired"
+            }
+        )
+    except InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "message": "Invalid token",
+                "errorCode": "invalid_token"
+            }
+        )
