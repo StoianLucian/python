@@ -1,4 +1,6 @@
 #  // run virtual enviroment "source venv/bin/activate"
 # // run server:  "uvicorn app:app --reload"
 # // run migrations: "alembic upgrade head"
+#             -> run specific folder migration alembic -c folder_name/alembic.ini upgrade head
 #  // create migration alembic revision -m "create_users_table"
+#              -> create specific folder migration ex: alembic -c folder_name/alembic.ini revision -m "migration_name"   
