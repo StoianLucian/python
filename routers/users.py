@@ -15,6 +15,7 @@ router = APIRouter(
 def create_user(user: UserCreate):
     try:
         created_user = create_user_db(user)
+        
         return created_user
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

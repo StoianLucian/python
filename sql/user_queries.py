@@ -1,6 +1,7 @@
 CREATE_USER = """
 INSERT INTO users (username, email, password)
 VALUES (%s, %s, %s)
+RETURNING id
 """
 
 GET_ALL_USERS = """

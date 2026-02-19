@@ -1,11 +1,25 @@
 from fastapi import FastAPI
 from routers import users, auth
-
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi import HTTPException
 
 app = FastAPI()
+
+# ----- CORS middleware -----
+origins = [
+    "http://localhost:5173",
+    "http://localhost:5173/"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,     # exact dev origins, or ["*"] for quick dev
+    allow_credentials=True,    # needed if you send cookies/auth headers
+    allow_methods=["*"],       # allows GET, POST, PUT, DELETE, OPTIONS
+    allow_headers=["*"],       # allows any headers
+)
 
 
 @app.exception_handler(HTTPException)

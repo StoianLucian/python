@@ -13,8 +13,8 @@ def create_user_db(userData):
             CREATE_USER,
             (userData.username, userData.email, password)
         )
-        cursor.lastrowid
-        return cursor.lastrowid
+        
+        return cursor.fetchone()[0]
 
 def get_all_users_db():
     with db_cursor() as (_, cursor):
