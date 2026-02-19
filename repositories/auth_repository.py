@@ -1,9 +1,8 @@
 from fastapi import HTTPException, Request, Response, status
 from pydantic import BaseModel
-from services.security import create_jwt, verify_jwt, verify_password
+from services import create_jwt, verify_jwt, verify_password
 from sql import LOGIN_USER
 from context.context_manager import db_cursor
-from dotenv import load_dotenv
 import os
 
 class LoginRequest(BaseModel):

@@ -1,12 +1,15 @@
-from db.connection import get_connection
-from sql import CREATE_USER, GET_ALL_USERS, GET_USER_BY_ID, DELETE_USER_BY_ID
-from fastapi import HTTPException
-from services.security import hash_password
+from services.security import check_match_password, hash_password
+from sql import CREATE_USER, GET_ALL_USERS, DELETE_USER_BY_ID, GET_USER_BY_ID
+from fastapi import HTTPException 
+
 from context.context_manager import db_cursor
+from schemas import UserCreate
 
 
-def create_user_db(userData):
+def create_user_db(userData:UserCreate):
     with db_cursor() as (_, cursor):  # <-- ai nevoie de ()
+        check_match_password(userData.password, userData.confirmPassword)
+        
         password = hash_password(userData.password)
 
         cursor.execute(

@@ -19,6 +19,15 @@ def hash_password(password):
     
 from typing import Union
 
+def check_match_password(password, confirmPassword):
+    if password != confirmPassword:
+            raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "message": "Passwords do not match",
+                "errorCode": "password_mismatch"
+            })
+
 def verify_password(password: str, hashed_password: Union[str, bytes]) -> bool:
     """
     Verifică parola.

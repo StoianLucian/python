@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from schemas.user_schemas import UserCreate, UserRead
+from schemas import *
 from helpers.helpers import raise_error
 
 from errors import UserErrorCode
@@ -18,7 +18,7 @@ def create_user(user: UserCreate):
         
         return created_user
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise e
     
 @router.get("/", response_model=list[UserRead])
 def get_all_users(user=Depends(check_token)):
@@ -26,7 +26,7 @@ def get_all_users(user=Depends(check_token)):
         users = get_all_users_db()
         return users
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise e
     
 @router.get("/{id}")
 def get_user_by_id(id, user=Depends(check_token)):
@@ -34,7 +34,7 @@ def get_user_by_id(id, user=Depends(check_token)):
         user = get_user_by_id_db(id)
         return user
     except Exception as e:
-        raise HTTPException(500, str(e))
+        raise e
 
     
 @router.delete("/{id}")
@@ -46,9 +46,3 @@ def delete_user_by_id(id: int, user=Depends(check_token)):
     except HTTPException as e:
         # forward HTTPException exact așa cum este
         raise e
-    except Exception as e:
-        # alte erori neașteptate
-        raise HTTPException(
-            status_code=500,
-            detail={"message": str(e), "code": "internal_error"}
-        )

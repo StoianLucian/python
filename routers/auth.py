@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from repositories import *
+from repositories import login_user_db, logout_user_db
 from pydantic import BaseModel
 from fastapi import Response
 
