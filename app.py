@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from errors.user import AppError
 from routers import users, auth
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Request
@@ -22,21 +23,14 @@ app.add_middleware(
 )
 
 
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    # asiguram ca detail este dict
-    detail = exc.detail if isinstance(exc.detail, dict) else {"message": str(exc.detail)}
+@app.exception_handler(AppError)
+async def app_error_handler(request: Request, exc: AppError):
     return JSONResponse(
         status_code=exc.status_code,
-        content=detail
-    )
-
-@app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception):
-    # erori neașteptate → JSON standard
-    return JSONResponse(
-        status_code=500,
-        content={"message": "Internal server error", "code": "internal_error"}
+        content={
+            "message": exc.message,
+            "errorCode": exc.error_code
+        },
     )
 
 # /users

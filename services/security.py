@@ -1,10 +1,15 @@
 from datetime import datetime, timedelta, timezone
+from errno import errorcode
 from fastapi import HTTPException, status
 from jwt import ExpiredSignatureError, InvalidTokenError
+from errors.user import EmailExistsError, UsernameExistsError
+from schemas.user_schemas import UserCreate
+from sql import CHECK_EXISTING_USER
 from dotenv import load_dotenv
 import os
 import jwt
 import bcrypt
+
 
 load_dotenv()
 JWT_SECRET = os.getenv("JWT_SECRET")
@@ -19,7 +24,22 @@ def hash_password(password):
     
 from typing import Union
 
-def check_match_password(password, confirmPassword):
+def check_existing_user(user:UserCreate, cursor):
+    
+    cursor.execute(CHECK_EXISTING_USER, (user.username, user.email))
+    result = cursor.fetchone()
+    
+    username_exists = result[0]
+    email_exists = result[1]
+    
+    if username_exists:
+        raise UsernameExistsError()
+    
+    if email_exists:
+            raise EmailExistsError()
+    
+
+def check_match_password(password: str, confirmPassword: str):
     if password != confirmPassword:
             raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

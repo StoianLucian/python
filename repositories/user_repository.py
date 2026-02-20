@@ -1,14 +1,14 @@
-from services.security import check_match_password, hash_password
+from services import check_match_password, hash_password, check_existing_user
 from sql import CREATE_USER, GET_ALL_USERS, DELETE_USER_BY_ID, GET_USER_BY_ID
 from fastapi import HTTPException 
 
 from context.context_manager import db_cursor
 from schemas import UserCreate
 
-
 def create_user_db(userData:UserCreate):
     with db_cursor() as (_, cursor):  # <-- ai nevoie de ()
         check_match_password(userData.password, userData.confirmPassword)
+        check_existing_user(userData, cursor)
         
         password = hash_password(userData.password)
 
