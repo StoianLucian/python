@@ -12,7 +12,8 @@ class LoginRequest(BaseModel):
 
 @router.post("/login")
 def login_user(loginData: LoginRequest, response: Response):
-    return login_user_db(loginData, response)
+    login_dict = loginData.model_dump()
+    return login_user_db(login_dict, response)
 
 @router.post("/logout")
 def logout_user(response: Response):
