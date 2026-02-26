@@ -22,3 +22,10 @@ class EmailExistsError(AppError):
             status_code=409
         )
         
+class NotAuthenticatedError(AppError):
+    def __init__(self):
+        super().__init__(
+            message="Not authenticated",
+            error_code="not_authenticated",
+            status_code=401
+        )

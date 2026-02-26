@@ -26,10 +26,9 @@ def get_all_users_db():
         return users
         
 def get_user_by_id_db(id: int):
-    with db_cursor() as (_, cursor):
+    with db_cursor(cursor_type="dict") as (_, cursor):
         cursor.execute(GET_USER_BY_ID, (id,))
         user = cursor.fetchone()
-        print(user)
         
         if user is None:
             raise HTTPException(

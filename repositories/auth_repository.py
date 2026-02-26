@@ -32,10 +32,14 @@ def logout_user_db(response: Response):
 
     return {"message": "logged out"}
 
+def get_current_user_db(user):
+    if not JWT_SECRET:
+       raise HTTPException(status_code=401, detail="Not authenticated")
 
 def login_user_db(loginData: LoginRequest, response: Response):
     with db_cursor(cursor_type="dict") as (_, cursor):
-        cursor.execute(LOGIN_USER, (loginData['account'], loginData['account']))
+        cursor.execute(
+            LOGIN_USER, (loginData['account'], loginData['account']))
         user = cursor.fetchone()
 
         if user is None:
@@ -45,7 +49,8 @@ def login_user_db(loginData: LoginRequest, response: Response):
                     "message": "User not found",
                     "errorCode": "user_not_found"
                 })
-        passwordCheck = verify_password(loginData['password'], user['password'])
+        passwordCheck = verify_password(
+            loginData['password'], user['password'])
 
         if passwordCheck is False:
             raise HTTPException(
@@ -60,10 +65,10 @@ def login_user_db(loginData: LoginRequest, response: Response):
             key=TOKEN_NAME,
             value=token,
             httponly=True,
-            secure=True,      # HTTPS only
-            samesite="Lax",   # or "Strict" / "None"
+            secure=False,       # HTTPS doar în prod
+            samesite="Lax",     # same-origin funcționează
             max_age=3600
-        )
+)
         # Remove password before returning user data
         user.pop("password", None)
         return user
