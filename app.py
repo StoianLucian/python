@@ -1,10 +1,9 @@
 from fastapi import FastAPI
 from errors.user import AppError
-from routers import users, auth
+from routers import files, users, auth
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from fastapi import HTTPException
 
 app = FastAPI()
 
@@ -37,3 +36,5 @@ async def app_error_handler(request: Request, exc: AppError):
 app.include_router(users.router)
 # /auth
 app.include_router(auth.router)
+# /files
+app.include_router(files.router)

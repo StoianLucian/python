@@ -4,7 +4,7 @@ from repositories import login_user_db, logout_user_db
 from pydantic import BaseModel
 from fastapi import Response
 
-from repositories.auth_repository import check_token, get_current_user_db
+from repositories.auth_repository import check_token
 from repositories.user_repository import get_user_by_id_db
 
 router = APIRouter(prefix="/auth", tags=["auth"])

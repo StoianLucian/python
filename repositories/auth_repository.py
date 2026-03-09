@@ -69,7 +69,8 @@ def login_user_db(loginData: LoginRequest, response: Response):
             httponly=True,
             secure=False,       # HTTPS doar în prod
             samesite="Lax",     # same-origin funcționează
-            max_age=60 * 60 * 5
+            max_age=60 * 60 * 5,
+            path="/"
         )
         # Remove password before returning user data
         user.pop("password", None)

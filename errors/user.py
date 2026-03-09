@@ -29,3 +29,12 @@ class NotAuthenticatedError(AppError):
             error_code="not_authenticated",
             status_code=401
         )
+        
+class PDFFileSupportedError(AppError):
+    def __init__(self):
+        super().__init__(
+            message="Pdf only supported",
+            error_code="pdf_type_supported",
+            status_code=401
+        )
+
