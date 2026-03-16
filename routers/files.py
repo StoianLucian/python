@@ -45,7 +45,7 @@ async def create_file(file: UploadFile = File(...), user=Depends(check_token)):
 
 @router.get("/")
 async def get_files(user=Depends(check_token)):
-    with db_cursor() as (_, cursor):
-        cursor.execute(GET_ALL_FILES, (user["user_id"],))
+    with db_cursor(cursor_type="dict") as (_, cursor):
+        await cursor.execute(GET_ALL_FILES, (user["user_id"],))
         files = cursor.fetchall()
         return files
