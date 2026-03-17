@@ -9,3 +9,9 @@ GET_ALL_FILES = """
     FROM files
     WHERE created_by = %s
 """
+
+GET_FILE_BY_ID = """
+    SELECT id, file_name, storage_key
+    FROM files
+    WHERE id = %s
+"""
