@@ -11,6 +11,8 @@ from schemas import *
 from repositories import *
 from sql.file_queries import GET_ALL_FILES, GET_FILE_BY_ID
 
+import pdfplumber
+
 router = APIRouter(
     prefix="/files",
     tags=["files"],
@@ -18,6 +20,16 @@ router = APIRouter(
 
 UPLOAD_FOLDER = "PDFS"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+
+def extract_text_from_pdf(file_path: str) -> str:
+    text = ""
+    with pdfplumber.open(file_path) as pdf:
+        for page in pdf.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
+    return text
 
 
 @router.post("/")
@@ -34,6 +46,9 @@ async def create_file(file: UploadFile = File(...), user=Depends(check_token)):
 
             upload_file_db(filename, storage_key, file.size,
                            file.content_type, user["user_id"])
+
+            # // extract page contents
+        extract_text_from_pdf(file_path)
 
     except Exception as e:
         # Optional: remove partial file if error occurs
@@ -58,10 +73,15 @@ async def get_file(id, user=Depends(check_token)):
         cursor.execute(GET_FILE_BY_ID, (id,))
         file = cursor.fetchone()
 
-        print(file.storage_key)
         file_path = os.path.join(UPLOAD_FOLDER, file.storage_key)
         return FileResponse(
             path=file_path,
             filename=file.file_name,  # original file name for download
             media_type="application/pdf"  # adjust based on file type
         )
+
+
+@router.delete("/{id}")
+async def delete_file(id, user=Depends(check_token)):
+    with db_cursor() as (_, cursor):
+        cursor.execute(DELETE_FILE_BY_ID, (id,))
