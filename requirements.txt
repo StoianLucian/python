@@ -1,6 +1,11 @@
-#  // run virtual enviroment "source venv/bin/activate"
-# // run server:  "uvicorn app:app --reload"
-# // run migrations: "alembic upgrade head"
-#             -> run specific folder migration alembic -c folder_name/alembic.ini upgrade head
-#  // create migration alembic revision -m "create_users_table"
-#              -> create specific folder migration ex: alembic -c folder_name/alembic.ini revision -m "migration_name"   
+alembic==1.16.5
+fastapi==0.135.3
+pdfplumber==0.11.8
+pgvector==0.4.2
+psycopg2_binary==2.9.11
+pydantic==2.12.5
+PyJWT==2.10.1
+PyJWT==2.12.1
+python-dotenv==1.2.2
+python_bcrypt==0.3.2
+SQLAlchemy==2.0.49
