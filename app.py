@@ -1,11 +1,12 @@
 from dotenv import load_dotenv
-load_dotenv()  
-from fastapi import FastAPI
-from errors.user import AppError
-from routers import files, users, auth
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+
+from errors.user import AppError
+from routers import auth, files, users
+
+load_dotenv()
 
 app = FastAPI()
 # ----- CORS middleware -----

@@ -1,6 +1,5 @@
 from typing import Union
 from datetime import datetime, timedelta, timezone
-from errno import errorcode
 from dotenv import load_dotenv
 from fastapi import HTTPException, status
 from jwt import ExpiredSignatureError, InvalidTokenError
@@ -14,7 +13,7 @@ import os
 import jwt
 import bcrypt
 
-# load_dotenv()
+load_dotenv()
 
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM")  # default to HS256
 
