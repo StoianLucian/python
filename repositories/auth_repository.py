@@ -17,7 +17,7 @@ def logout_user_db(response: Response):
     try:
         response.delete_cookie(
             key=TOKEN_NAME,
-            secure=True,
+            secure=False,  # match login_user_db set_cookie (local HTTP); use True behind HTTPS in prod
             httponly=True,
             samesite="Lax",
             path="/"

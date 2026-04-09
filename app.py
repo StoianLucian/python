@@ -11,12 +11,12 @@ app = FastAPI()
 # ----- CORS middleware -----
 origins = [
     "http://localhost:5173",
-    "http://localhost:5173/"
+    "http://127.0.0.1:5173",  # same dev server, different host string in the browser
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[origins],     # exact dev origins, or ["*"] for quick dev
+    allow_origins=origins,
     allow_credentials=True,    # needed if you send cookies/auth headers
     allow_methods=["*"],       # allows GET, POST, PUT, DELETE, OPTIONS
     allow_headers=["*"],       # allows any headers

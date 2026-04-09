@@ -22,8 +22,9 @@ def logout_user(response: Response):
 
 
 @router.get("/me")
-def get_current_user(user=Depends(check_token)):
+def get_current_user(user=Depends(check_token), db: Session = Depends(get_db)):
+
     if not user:
         raise NotAuthenticatedError()
-    user = get_user_by_id_db(user["user_id"])
+    user = get_user_by_id_db(user["user_id"], db)
     return user

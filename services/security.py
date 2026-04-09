@@ -72,7 +72,7 @@ def create_jwt(user_id: int) -> str:
     payload = {
         "user_id": user_id,
         "iat": datetime.now(tz=timezone.utc),
-        "exp": datetime.now(tz=timezone.utc) + timedelta(minutes=15)
+        "exp": datetime.now(tz=timezone.utc) + timedelta(hours=5)  # align with auth cookie max_age
     }
 
     if not JWT_ALGORITHM or not JWT_SECRET:
@@ -84,7 +84,6 @@ def create_jwt(user_id: int) -> str:
 
 
 def verify_jwt(token: str) -> dict:
-    print(JWT_SECRET, JWT_ALGORITHM)
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         return payload
