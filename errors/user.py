@@ -5,12 +5,31 @@ class AppError(Exception):
         self.status_code = status_code
         super().__init__(message)
 
-class UsernameExistsError(AppError):
+
+class AccountAlreadyExistsError(AppError):
     def __init__(self):
         super().__init__(
-            message="Username already exists",
-            error_code="username_exists",
+            message="Account already exists",
+            error_code="account_exists",
             status_code=409
+        )
+
+
+class ErrorDeletingUserError(AppError):
+    def __init__(self):
+        super().__init__(
+            message="Error deleting user",
+            error_code="delete_user_error",
+            status_code=409
+        )
+
+
+class UserNotFoundError(AppError):
+    def __init__(self):
+        super().__init__(
+            message="User not found",
+            error_code="user_not_found",
+            status_code=404
         )
 
 
@@ -21,7 +40,8 @@ class EmailExistsError(AppError):
             error_code="email_exists",
             status_code=409
         )
-        
+
+
 class NotAuthenticatedError(AppError):
     def __init__(self):
         super().__init__(
@@ -29,7 +49,8 @@ class NotAuthenticatedError(AppError):
             error_code="not_authenticated",
             status_code=401
         )
-        
+
+
 class PDFFileSupportedError(AppError):
     def __init__(self):
         super().__init__(
@@ -37,4 +58,3 @@ class PDFFileSupportedError(AppError):
             error_code="pdf_type_supported",
             status_code=401
         )
-

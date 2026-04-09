@@ -10,6 +10,3 @@ class UserCreate(UserBase):
     
 class UserRead(UserBase):
     id: int
-
-    class Config:
-        orm_mode = True

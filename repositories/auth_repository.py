@@ -1,14 +1,12 @@
 from fastapi import HTTPException, Request, Response, status
-from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from db.schemas.user import User
+from dto.auth.auth import LoginRequest
 from services import create_jwt, verify_jwt, verify_password
+from services.security import return_user_object
 from sql import LOGIN_USER
-from context.context_manager import db_cursor
 import os
-
-
-class LoginRequest(BaseModel):
-    account: str
-    password: str
+# load_dotenv()
 
 
 TOKEN_NAME = os.getenv("TOKEN_NAME")
@@ -38,43 +36,41 @@ def get_current_user_db(user):
         raise HTTPException(status_code=401, detail="Not authenticated")
 
 
-def login_user_db(loginData: LoginRequest, response: Response):
-    with db_cursor(cursor_type="dict") as (_, cursor):
-        cursor.execute(
-            LOGIN_USER, (loginData['account'], loginData['account']))
-        user = cursor.fetchone()
+def login_user_db(loginData: LoginRequest, response: Response, db: Session):
 
-        if user is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "message": "User not found",
-                    "errorCode": "user_not_found"
-                })
-        passwordCheck = verify_password(
-            loginData['password'], user['password'])
+    user = return_user_object(loginData, db)
 
-        if passwordCheck is False:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "message": "User not found",
-                    "errorCode": "user_not_found"
-                })
-        token = create_jwt(user['id'])
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": "User not found",
+                "errorCode": "user_not_found"
+            })
 
-        response.set_cookie(
-            key=TOKEN_NAME,
-            value=token,
-            httponly=True,
-            secure=False,       # HTTPS doar în prod
-            samesite="Lax",     # same-origin funcționează
-            max_age=60 * 60 * 5,
-            path="/"
-        )
-        # Remove password before returning user data
-        user.pop("password", None)
-        return user
+    passwordCheck = verify_password(
+        loginData.password, user.password)
+
+    if passwordCheck is False:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": "User not found",
+                "errorCode": "user_not_found"
+            })
+    token = create_jwt(user.id)
+
+    response.set_cookie(
+        key=TOKEN_NAME,
+        value=token,
+        httponly=True,
+        secure=False,       # HTTPS doar în prod
+        samesite="Lax",     # same-origin funcționează
+        max_age=60 * 60 * 5,
+        path="/"
+    )
+    # Remove password before returning user data to do
+    return user
 
 
 def check_token(request: Request):

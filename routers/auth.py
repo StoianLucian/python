@@ -1,23 +1,19 @@
 from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from db.connection2 import get_db
 from errors.user import NotAuthenticatedError
 from repositories import login_user_db, logout_user_db
-from pydantic import BaseModel
 from fastapi import Response
 
-from repositories.auth_repository import check_token
+from repositories.auth_repository import LoginRequest, check_token
 from repositories.user_repository import get_user_by_id_db
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-class LoginRequest(BaseModel):
-    account: str
-    password: str
-
 @router.post("/login")
-def login_user(loginData: LoginRequest, response: Response):
-    login_dict = loginData.model_dump()
-    return login_user_db(login_dict, response)
+def login_user(loginData: LoginRequest, response: Response, db: Session = Depends(get_db)):
+    return login_user_db(loginData, response, db)
 
 
 @router.post("/logout")

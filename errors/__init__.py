@@ -1,3 +1,1 @@
-from .users import *
-
-ALL_ERROR_CODES = {**UserErrorCode.__members__}
+from .user import *

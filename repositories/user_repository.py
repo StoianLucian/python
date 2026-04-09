@@ -1,46 +1,56 @@
+from datetime import datetime
+from db.connection2 import get_db
+from db.schemas.user import User
+from errors.user import UserNotFoundError
 from services import check_match_password, hash_password, check_existing_user
 from sql import CREATE_USER, GET_ALL_USERS, DELETE_USER_BY_ID, GET_USER_BY_ID
-from fastapi import HTTPException 
-
+from fastapi import Depends, HTTPException
+from sqlalchemy.orm import Session, load_only
 from context.context_manager import db_cursor
 from schemas import UserCreate
 
-def create_user_db(userData:UserCreate):
-    with db_cursor() as (_, cursor):  # <-- ai nevoie de ()
-        check_match_password(userData.password, userData.confirmPassword)
-        check_existing_user(userData, cursor)
-        
-        password = hash_password(userData.password)
 
-        cursor.execute(
-            CREATE_USER,
-            (userData.username, userData.email, password)
-        )
-        
-        return cursor.fetchone()[0]
+def create_user_db(userData: UserCreate, db: Session):
+    check_match_password(userData.password, userData.confirmPassword)
+    check_existing_user(userData, db)
+
+    user = User(
+        username=userData.username,
+        email=userData.email,
+        password=hash_password(userData.password),
+        created_at=datetime.now()
+    )
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user.id
+
 
 def get_all_users_db():
     with db_cursor() as (_, cursor):
         cursor.execute(GET_ALL_USERS)
         users = cursor.fetchall()
         return users
-        
-def get_user_by_id_db(id: int):
-    with db_cursor(cursor_type="dict") as (_, cursor):
-        cursor.execute(GET_USER_BY_ID, (id,))
-        user = cursor.fetchone()
-        
-        if user is None:
-            raise HTTPException(
-                status_code=404,
-                detail={
-                    "message": "User not found",
-                    "errorCode": "user_not_found"
-                })
-        
-        return user
-        
-def delete_user_by_id_db(id: int) -> bool:
-    with db_cursor() as (_, cursor):
-        cursor.execute(DELETE_USER_BY_ID, (id,))
-        return cursor.rowcount > 0
+
+
+def get_user_by_id_db(id: int, db: Session):
+
+    user = db.query(User).options(
+        load_only(User.id, User.username, User.email)
+    ).filter(User.id == id).first()
+
+    if user is None:
+        raise UserNotFoundError()
+
+    return user
+
+
+def delete_user_by_id_db(id: int, db: Session) -> bool:
+
+    user = get_user_by_id_db(id, db)
+
+    db.delete(user)
+    db.commit()
+
+    return True

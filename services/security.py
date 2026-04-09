@@ -1,52 +1,55 @@
+from typing import Union
 from datetime import datetime, timedelta, timezone
 from errno import errorcode
+from dotenv import load_dotenv
 from fastapi import HTTPException, status
 from jwt import ExpiredSignatureError, InvalidTokenError
-from errors.user import EmailExistsError, UsernameExistsError
+from sqlalchemy import or_
+from sqlalchemy.orm import Session
+from db.schemas.user import User
+from errors.user import AccountAlreadyExistsError, UserNotFoundError
+from repositories.auth_repository import LoginRequest
 from schemas.user_schemas import UserCreate
-from sql import CHECK_EXISTING_USER
-from dotenv import load_dotenv
 import os
 import jwt
 import bcrypt
 
+# load_dotenv()
 
-load_dotenv()
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM")  # default to HS256
+
+TOKEN_NAME = os.getenv("TOKEN_NAME")
 JWT_SECRET = os.getenv("JWT_SECRET")
-JWT_ALGORITHM = os.getenv("JWT_ALGORITHM")
+
 
 def hash_password(password):
     salt = bcrypt.gensalt()
     password_bytes = password.encode('utf-8')
     hashed_password = bcrypt.hashpw(password_bytes, salt)
-    
-    return hashed_password
-    
-from typing import Union
 
-def check_existing_user(user:UserCreate, cursor):
-    
-    cursor.execute(CHECK_EXISTING_USER, (user.username, user.email))
-    result = cursor.fetchone()
-    
-    username_exists = result[0]
-    email_exists = result[1]
-    
-    if username_exists:
-        raise UsernameExistsError()
-    
-    if email_exists:
-            raise EmailExistsError()
-    
+    return hashed_password
+
+
+def check_existing_user(user: UserCreate, db: Session):
+    existing = db.query(User).filter(
+        or_(
+            User.email == user.email,
+            User.username == user.username
+        )).first()
+
+    if existing:
+        raise AccountAlreadyExistsError()
+
 
 def check_match_password(password: str, confirmPassword: str):
     if password != confirmPassword:
-            raise HTTPException(
+        raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
                 "message": "Passwords do not match",
                 "errorCode": "password_mismatch"
             })
+
 
 def verify_password(password: str, hashed_password: Union[str, bytes]) -> bool:
     """
@@ -72,9 +75,13 @@ def create_jwt(user_id: int) -> str:
         "exp": datetime.now(tz=timezone.utc) + timedelta(minutes=15)
     }
 
+    if not JWT_ALGORITHM or not JWT_SECRET:
+        raise RuntimeError("env not loaded")
+
     token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
     return token
+
 
 def verify_jwt(token: str) -> dict:
     print(JWT_SECRET, JWT_ALGORITHM)
@@ -97,3 +104,16 @@ def verify_jwt(token: str) -> dict:
                 "errorCode": "invalid_token"
             }
         )
+
+
+def return_user_object(loginData: LoginRequest, db: Session):
+    user = db.query(User).filter(
+        or_(
+            User.email == loginData.account,
+            User.username == loginData.account
+        )).first()
+
+    if not user:
+        raise UserNotFoundError()
+
+    return user

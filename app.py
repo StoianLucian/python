@@ -1,3 +1,5 @@
+from dotenv import load_dotenv
+load_dotenv()  
 from fastapi import FastAPI
 from errors.user import AppError
 from routers import files, users, auth
@@ -6,7 +8,6 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 app = FastAPI()
-
 # ----- CORS middleware -----
 origins = [
     "http://localhost:5173",
