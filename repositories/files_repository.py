@@ -1,22 +1,20 @@
 import string
+from sqlalchemy.orm import Session
+from db.schemas.file import File
 
-from context.context_manager import db_cursor
-from sql.file_queries import CREATE_FILE
 
+def upload_file_db(filename: string, storageKey: string, size: int, type: string, createdBy: string, db: Session):
 
-def upload_file_db(filename: string, storageKey: string, size: int, type: string, createdBy: string):
-    print({filename, storageKey, size, type, createdBy})
-    with db_cursor() as (_, cursor):  # <-- ai nevoie de ()
+    file = File(
+        file_name=filename,
+        storage_key=storageKey,
+        file_size=size,
+        file_type=type,
+        created_by=createdBy,
+    )
 
-        cursor.execute(
-            CREATE_FILE,
-            (filename, storageKey, size, type, createdBy)
-        )
+    db.add(file)
+    db.commit()
+    db.refresh(file)
 
-        return {
-            "uploaded_by": createdBy,
-            "filename": filename,
-            "content_type": type,
-            "size": size
-        }
-        
+    return file

@@ -4,7 +4,6 @@ from db.schemas.user import User
 from dto.auth.auth import LoginRequest
 from services import create_jwt, verify_jwt, verify_password
 from services.security import return_user_object
-from sql import LOGIN_USER
 import os
 # load_dotenv()
 

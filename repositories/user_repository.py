@@ -3,8 +3,6 @@ from db.connection2 import get_db
 from db.schemas.user import User
 from errors.user import UserNotFoundError
 from services import check_match_password, hash_password, check_existing_user
-from sql import CREATE_USER, GET_ALL_USERS, DELETE_USER_BY_ID, GET_USER_BY_ID
-from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session, load_only
 from context.context_manager import db_cursor
 from schemas import UserCreate
@@ -27,11 +25,10 @@ def create_user_db(userData: UserCreate, db: Session):
     return user.id
 
 
-def get_all_users_db():
-    with db_cursor() as (_, cursor):
-        cursor.execute(GET_ALL_USERS)
-        users = cursor.fetchall()
-        return users
+def get_all_users_db(db: Session):
+    users = db.query(User).options(
+        load_only(User.id, User.username, User.email)).all()
+    return users
 
 
 def get_user_by_id_db(id: int, db: Session):

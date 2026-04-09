@@ -9,7 +9,6 @@ from repositories.files_repository import upload_file_db
 from schemas import *
 
 from repositories import *
-from sql.file_queries import GET_ALL_FILES, GET_FILE_BY_ID
 
 import pdfplumber
 
@@ -33,19 +32,23 @@ def extract_text_from_pdf(file_path: str) -> str:
 
 
 @router.post("/")
-async def create_file(file: UploadFile = File(...), user=Depends(check_token)):
+async def create_file(file: UploadFile = File(...), user=Depends(check_token), db: Session = Depends(get_db)):
     if file.content_type != "application/pdf":
         raise PDFFileSupportedError()
 
     filename = file.filename
     storage_key = f"{uuid.uuid4()}_{filename}"
     file_path = os.path.join(UPLOAD_FOLDER, storage_key)
+
+    file = upload_file_db(filename, storage_key, file.size,
+                          file.content_type, user["user_id"], db)
+
     try:
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
             upload_file_db(filename, storage_key, file.size,
-                           file.content_type, user["user_id"])
+                           file.content_type, user["user_id"], db)
 
             # // extract page contents
         extract_text_from_pdf(file_path)
@@ -61,16 +64,15 @@ async def create_file(file: UploadFile = File(...), user=Depends(check_token)):
 
 @router.get("/")
 async def get_files(user=Depends(check_token)):
-    with db_cursor(cursor_type="dict") as (_, cursor):
-        cursor.execute(GET_ALL_FILES, (user["user_id"],))
-        files = cursor.fetchall()
-        return files
+    # with db_cursor(cursor_type="dict") as (_, cursor):
+    # files = cursor.fetchall()
+    return []
 
 
 @router.get("/{id}")
 async def get_file(id, user=Depends(check_token)):
     with db_cursor() as (_, cursor):
-        cursor.execute(GET_FILE_BY_ID, (id,))
+        # cursor.execute(GET_FILE_BY_ID, (id,))
         file = cursor.fetchone()
 
         file_path = os.path.join(UPLOAD_FOLDER, file.storage_key)
@@ -84,4 +86,4 @@ async def get_file(id, user=Depends(check_token)):
 @router.delete("/{id}")
 async def delete_file(id, user=Depends(check_token)):
     with db_cursor() as (_, cursor):
-        cursor.execute(DELETE_FILE_BY_ID, (id,))
+        return "test"
