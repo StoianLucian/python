@@ -22,10 +22,10 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
         raise e
 
 
-@router.get("/", response_model=list[UserRead])
-def get_all_users(user=Depends(check_token)):
+@router.get("/", response_model=list[UserRead], )
+def get_all_users(user=Depends(check_token), db: Session = Depends(get_db)):
     try:
-        users = get_all_users_db()
+        users = get_all_users_db(db)
         return users
     except Exception as e:
         raise e

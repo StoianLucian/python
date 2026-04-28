@@ -58,3 +58,11 @@ class PDFFileSupportedError(AppError):
             error_code="pdf_type_supported",
             status_code=401
         )
+        
+class EmptyPDFFileError(AppError):
+    def __init__(self):
+        super().__init__(
+            message="PDF file is empty",
+            error_code="pdf_file_empty",
+            status_code=400
+        )

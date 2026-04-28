@@ -1,16 +1,17 @@
-import shutil
-from typing import Any, Dict
+import os
 import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from errors.user import PDFFileSupportedError
-from repositories.files_repository import upload_file_db
-from schemas import *
-
-from repositories import *
+from sqlalchemy.orm import Session, load_only
 
 import pdfplumber
+
+from db.schemas.file import File as FileModel
+
+from errors.user import EmptyPDFFileError, PDFFileSupportedError
+from repositories.files_repository import upload_file_db
+from repositories import check_token, get_db
 
 router = APIRouter(
     prefix="/files",
@@ -32,7 +33,11 @@ def extract_text_from_pdf(file_path: str) -> str:
 
 
 @router.post("/")
-async def create_file(file: UploadFile = File(...), user=Depends(check_token), db: Session = Depends(get_db)):
+async def create_file(
+    file: UploadFile = File(...),
+    user=Depends(check_token),
+    db: Session = Depends(get_db)
+):
     if file.content_type != "application/pdf":
         raise PDFFileSupportedError()
 
@@ -40,50 +45,74 @@ async def create_file(file: UploadFile = File(...), user=Depends(check_token), d
     storage_key = f"{uuid.uuid4()}_{filename}"
     file_path = os.path.join(UPLOAD_FOLDER, storage_key)
 
-    file = upload_file_db(filename, storage_key, file.size,
-                          file.content_type, user["user_id"], db)
-
     try:
+        content = await file.read()
+
+        if not content:
+            raise EmptyPDFFileError()
+
         with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            buffer.write(content)
 
-            upload_file_db(filename, storage_key, file.size,
-                           file.content_type, user["user_id"], db)
+        # ✅ STORE IN DB
+        upload_file_db(
+            filename,
+            storage_key,
+            len(content),  # safer than file.size
+            file.content_type,
+            user["user_id"],
+            db
+        )
 
-            # // extract page contents
-        extract_text_from_pdf(file_path)
+        # ✅ EXTRACT TEXT
+        text = extract_text_from_pdf(file_path)
+
+        return {
+            "filename": filename,
+            "size": len(content),
+            "preview": text[:200]
+        }
 
     except Exception as e:
-        # Optional: remove partial file if error occurs
         if os.path.exists(file_path):
             os.remove(file_path)
-        raise e  # re-raise so FastAPI returns 500
-
-    # body can be anything: dict, list, string, number, etc.
+        raise e
 
 
 @router.get("/")
-async def get_files(user=Depends(check_token)):
-    # with db_cursor(cursor_type="dict") as (_, cursor):
-    # files = cursor.fetchall()
-    return []
+async def get_files(user=Depends(check_token), db: Session = Depends(get_db)):
+    files = db.query(FileModel).options(load_only(FileModel.file_name, FileModel.id)).filter(
+        FileModel.created_by == user["user_id"]).all()
+
+    return files
 
 
 @router.get("/{id}")
-async def get_file(id, user=Depends(check_token)):
-    with db_cursor() as (_, cursor):
-        # cursor.execute(GET_FILE_BY_ID, (id,))
-        file = cursor.fetchone()
+async def get_file(id: int, user=Depends(check_token), db: Session = Depends(get_db)):
+    file = db.query(FileModel).filter(FileModel.id == id,
+                                      FileModel.created_by == user["user_id"]).first()
 
-        file_path = os.path.join(UPLOAD_FOLDER, file.storage_key)
-        return FileResponse(
-            path=file_path,
-            filename=file.file_name,  # original file name for download
-            media_type="application/pdf"  # adjust based on file type
-        )
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    file_path = os.path.join(UPLOAD_FOLDER, file.storage_key)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File missing on disk")
+
+    return FileResponse(
+        path=file_path,
+        filename=file.file_name,
+        media_type="application/pdf"
+    )
 
 
 @router.delete("/{id}")
-async def delete_file(id, user=Depends(check_token)):
-    with db_cursor() as (_, cursor):
-        return "test"
+async def delete_file(id: int, user=Depends(check_token), db: Session = Depends(get_db)):
+    file = db.query(FileModel).filter(FileModel.id == id,
+                                      FileModel.created_by == user["user_id"]).first()
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+    db.delete(file)
+    db.commit()
+    return {"status": "ok"}
