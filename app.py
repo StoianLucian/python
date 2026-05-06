@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from errors.user import AppError
-from routers import auth, files, users
+from routers import auth, files, users, aiChat
 
 load_dotenv()
 
@@ -40,3 +40,5 @@ app.include_router(users.router)
 app.include_router(auth.router)
 # /files
 app.include_router(files.router)
+# /chat
+app.include_router(aiChat.router)
