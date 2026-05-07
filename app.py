@@ -10,18 +10,13 @@ load_dotenv()
 
 app = FastAPI()
 # ----- CORS middleware -----
-origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",  # same dev server, different host string in the browser
-    "https://python-react-ehkr-git-main-stoianlucians-projects.vercel.app"
-]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "https://python-react-ehkr-git-main-stoianlucians-projects.vercel.app/",
+        "https://python-react-ehkr-git-main-stoianlucians-projects.vercel.app",
         "https://python-react-ehkr.vercel.app"
     ],
     allow_credentials=True,
