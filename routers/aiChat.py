@@ -21,9 +21,11 @@ class ChatRequest(BaseModel):
 def chat(body: ChatRequest = Body(...)):
     prompt = body.prompt
 
+    print("test")
     def generate():
         with requests.post(
-            "http://localhost:11434/api/generate",
+            # "http://localhost:11434/api/generate",
+            "https://ducky-pork-bleach.ngrok-free.dev/api/generate",
             json={
                 "model": "deepseek-r1:1.5b",
                 "prompt": prompt,
