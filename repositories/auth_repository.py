@@ -15,7 +15,8 @@ def logout_user_db(response: Response):
     try:
         response.delete_cookie(
             key=TOKEN_NAME,
-            secure=False,  # match login_user_db set_cookie (local HTTP); use True behind HTTPS in prod
+            # match login_user_db set_cookie (local HTTP); use True behind HTTPS in prod
+            secure=False,
             httponly=True,
             samesite="Lax",
             path="/"
@@ -62,7 +63,7 @@ def login_user_db(loginData: LoginRequest, response: Response, db: Session):
         key=TOKEN_NAME,
         value=token,
         httponly=True,
-        secure=False,       # HTTPS doar în prod
+        secure=True,       # HTTPS doar în prod
         samesite="Lax",     # same-origin funcționează
         max_age=60 * 60 * 5,
         path="/"
@@ -73,8 +74,7 @@ def login_user_db(loginData: LoginRequest, response: Response, db: Session):
 
 def check_token(request: Request):
     token = request.cookies.get(TOKEN_NAME)
-    
-    
+
     print(token, "token")
     if token is None:
         raise HTTPException(
