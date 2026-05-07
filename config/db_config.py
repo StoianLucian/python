@@ -6,3 +6,4 @@ DB_CONFIG = {
     "port": 5432,
     "embeddings_database" : "python_embeddings_db"
 }
+# https://ducky-pork-bleach.ngrok-free.dev

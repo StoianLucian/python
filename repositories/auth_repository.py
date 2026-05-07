@@ -5,7 +5,6 @@ from dto.auth.auth import LoginRequest
 from services import create_jwt, verify_jwt, verify_password
 from services.security import return_user_object
 import os
-# load_dotenv()
 
 
 TOKEN_NAME = os.getenv("TOKEN_NAME")
