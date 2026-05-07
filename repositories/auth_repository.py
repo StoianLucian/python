@@ -37,8 +37,6 @@ def get_current_user_db(user):
 
 def login_user_db(loginData: LoginRequest, response: Response, db: Session):
 
-
-    return loginData
     user = return_user_object(loginData, db)
 
     if user is None:
