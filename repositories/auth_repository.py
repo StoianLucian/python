@@ -15,11 +15,10 @@ def logout_user_db(response: Response):
     try:
         response.delete_cookie(
             key=TOKEN_NAME,
-            # match login_user_db set_cookie (local HTTP); use True behind HTTPS in prod
-            secure=False,
+            path="/",
+            secure=True,
             httponly=True,
-            samesite="Lax",
-            path="/"
+            samesite="None",
         )
     except Exception as e:
         raise HTTPException(
@@ -63,8 +62,8 @@ def login_user_db(loginData: LoginRequest, response: Response, db: Session):
         key=TOKEN_NAME,
         value=token,
         httponly=True,
-        secure=True,       # HTTPS doar în prod
-        samesite="Lax",     # same-origin funcționează
+        secure=True,
+        samesite="None",
         max_age=60 * 60 * 5,
         path="/"
     )
@@ -75,7 +74,7 @@ def login_user_db(loginData: LoginRequest, response: Response, db: Session):
 def check_token(request: Request):
     token = request.cookies.get(TOKEN_NAME)
 
-    print(token, "token", TOKEN_NAME)
+    print(token, "token", TOKEN_NAME, "2")
     if token is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
