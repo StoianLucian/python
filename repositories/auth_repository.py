@@ -73,6 +73,9 @@ def login_user_db(loginData: LoginRequest, response: Response, db: Session):
 
 def check_token(request: Request):
     token = request.cookies.get(TOKEN_NAME)
+    
+    
+    print(token, "token")
     if token is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
