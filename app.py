@@ -18,10 +18,14 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,    # needed if you send cookies/auth headers
-    allow_methods=["*"],       # allows GET, POST, PUT, DELETE, OPTIONS
-    allow_headers=["*"],       # allows any headers
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://python-react-ehkr-b0lzjbrwf-stoianlucians-projects.vercel.app"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
