@@ -13,6 +13,7 @@ app = FastAPI()
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",  # same dev server, different host string in the browser
+    "https://python-react-ehkr-git-main-stoianlucians-projects.vercel.app"
 ]
 
 app.add_middleware(
