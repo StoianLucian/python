@@ -5,6 +5,7 @@ from dto.auth.auth import LoginRequest
 from services import create_jwt, verify_jwt, verify_password
 from services.security import return_user_object
 import os
+import logging
 
 
 TOKEN_NAME = os.getenv("TOKEN_NAME")
@@ -12,6 +13,7 @@ JWT_SECRET = os.getenv("JWT_SECRET")
 
 
 def logout_user_db(response: Response):
+    logging.info('auth_repository.logout_user_db')
     try:
         response.delete_cookie(
             key=TOKEN_NAME,
@@ -30,12 +32,13 @@ def logout_user_db(response: Response):
 
 
 def get_current_user_db(user):
+    logging.info('auth_repository.get_current_user_db')
     if not JWT_SECRET:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
 
 def login_user_db(loginData: LoginRequest, response: Response, db: Session):
-
+    logging.info('auth_repository.login_user_db')
     user = return_user_object(loginData, db)
 
     if user is None:
@@ -48,6 +51,8 @@ def login_user_db(loginData: LoginRequest, response: Response, db: Session):
 
     passwordCheck = verify_password(
         loginData.password, user.password)
+
+    logging.debug(f"auth_repository.login_user_db {passwordCheck}")
 
     if passwordCheck is False:
         raise HTTPException(

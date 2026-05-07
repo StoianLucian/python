@@ -2,9 +2,13 @@ import string
 from sqlalchemy.orm import Session
 from db.schemas.file import File
 from datetime import datetime
+import logging
 
 
 def upload_file_db(filename: string, storageKey: string, size: int, type: string, createdBy: string, db: Session):
+
+    logging.debug("files_repository.upload_file_db", [
+                  filename, storageKey, size, type, createdBy])
 
     file = File(
         file_name=filename,

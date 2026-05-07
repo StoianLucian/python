@@ -6,6 +6,13 @@ from fastapi.responses import JSONResponse
 from errors.user import AppError
 from routers import auth, files, users, aiChat, test
 
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+)
+
 load_dotenv()
 
 app = FastAPI()
