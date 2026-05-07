@@ -3,6 +3,7 @@ from schemas import *
 from fastapi.responses import StreamingResponse
 import requests
 import json
+import logging
 
 
 from repositories import *
@@ -22,6 +23,7 @@ def chat(body: ChatRequest = Body(...)):
     prompt = body.prompt
 
     print("test", prompt)
+    return prompt
     def generate():
         with requests.post(
             # "http://localhost:11434/api/generate",
@@ -30,7 +32,8 @@ def chat(body: ChatRequest = Body(...)):
                 "model": "deepseek-r1:1.5b",
                 "prompt": prompt,
                 "stream": True
-            }
+            },
+            stream=True
         ) as r:
 
             for line in r.iter_lines(decode_unicode=True):
