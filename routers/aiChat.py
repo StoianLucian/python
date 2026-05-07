@@ -22,8 +22,8 @@ class ChatRequest(BaseModel):
 def chat(body: ChatRequest = Body(...)):
     prompt = body.prompt
 
-    print("test", prompt)
-    return prompt
+    # print("test", prompt)
+    # return prompt
     def generate():
         with requests.post(
             # "http://localhost:11434/api/generate",
