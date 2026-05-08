@@ -11,7 +11,8 @@ from db.schemas.file import File as FileModel
 
 from errors.user import EmptyPDFFileError, PDFFileSupportedError
 from repositories.files_repository import upload_file_db
-from repositories import check_token, get_db
+from repositories.auth_repository import check_token
+from db.connection import get_db
 
 router = APIRouter(
     prefix="/files",
@@ -81,7 +82,7 @@ async def create_file(
 
 @router.get("/")
 async def get_files(user=Depends(check_token), db: Session = Depends(get_db)):
-    
+
     print("here")
     files = db.query(FileModel).options(load_only(FileModel.file_name, FileModel.id)).filter(
         FileModel.created_by == user["user_id"]).all()

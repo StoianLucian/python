@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
+from db.connection import get_db
 from schemas import *
-from helpers.helpers import raise_error
 from sqlalchemy.orm import Session
 
 from repositories import *

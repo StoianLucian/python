@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from db.connection2 import get_db
+from db.connection import get_db
 from errors.user import NotAuthenticatedError
 from repositories import login_user_db, logout_user_db
 from fastapi import Response

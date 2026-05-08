@@ -1,5 +1,4 @@
 from datetime import datetime
-from db.connection2 import get_db
 from db.schemas.user import User
 from errors.user import UserNotFoundError
 from services import check_match_password, hash_password, check_existing_user
