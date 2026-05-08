@@ -15,6 +15,7 @@ router = APIRouter(
 
 class ChatRequest(BaseModel):
     prompt: str
+    model: str
 
 
 client = Client(
@@ -25,15 +26,15 @@ client = Client(
 @router.post("/")
 def chat(body: ChatRequest = Body(...)):
     prompt = body.prompt
+    model = body.model
     logging.info(f"aiChat.chat prompt: {prompt}")
 
     def generate():
         stream = client.generate(
-            model="qwen3:8b",
+            model=model,
             prompt=prompt,
             stream=True
         )
-        # model="deepseek-r1:1.5b",
         for chunk in stream:
 
             response = chunk.get("response")
