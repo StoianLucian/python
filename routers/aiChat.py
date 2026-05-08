@@ -1,9 +1,8 @@
 from fastapi import APIRouter, Body, Depends, HTTPException
+from repositories.aiChat_repository import initialize_model
 from schemas import *
 from fastapi.responses import StreamingResponse
 import logging
-from ollama import Client
-import os
 
 
 from repositories import *
@@ -12,29 +11,21 @@ router = APIRouter(
     prefix="/chat",
     tags=["chat"],
 )
+
+
 class ChatRequest(BaseModel):
     prompt: str
     model: str
 
-modelUrl = os.getenv("MODEL_URL")
-
-client = Client(
-    host=modelUrl
-)
-
 
 @router.post("/")
-def chat(body: ChatRequest = Body(...)):
+def chat(body: ChatRequest):
     prompt = body.prompt
     model = body.model
     logging.info(f"aiChat.chat prompt: {prompt}")
 
     def generate():
-        stream = client.generate(
-            model=model,
-            prompt=prompt,
-            stream=True
-        )
+        stream = initialize_model(model, prompt, True)
         for chunk in stream:
 
             response = chunk.get("response")
@@ -48,3 +39,22 @@ def chat(body: ChatRequest = Body(...)):
         generate(),
         media_type="text/plain"
     )
+
+
+class ChatRequest(BaseModel):
+    model: str
+
+
+@router.post("/ping")
+def chat(body: ChatRequest):
+    prompt = "Only return true if you are online"
+    model = body.model
+
+    try:
+        response = initialize_model(model, prompt, False)
+        if not response.get("response"):
+            return False
+
+        return True
+    except Exception as e:
+        raise e
