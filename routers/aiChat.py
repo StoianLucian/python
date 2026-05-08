@@ -3,6 +3,7 @@ from schemas import *
 from fastapi.responses import StreamingResponse
 import logging
 from ollama import Client
+import os
 
 
 from repositories import *
@@ -11,15 +12,14 @@ router = APIRouter(
     prefix="/chat",
     tags=["chat"],
 )
-
-
 class ChatRequest(BaseModel):
     prompt: str
     model: str
 
+modelUrl = os.getenv("MODEL_URL")
 
 client = Client(
-    host="https://ducky-pork-bleach.ngrok-free.dev"
+    host=modelUrl
 )
 
 
