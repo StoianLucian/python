@@ -6,4 +6,4 @@
 #              -> create specific folder migration ex: alembic -c folder_name/alembic.ini revision -m "migration_name"
 
 #  start ai "ngrok http 11434"
-#  allow request from outside OLLAMA_HOST=0.0.0.0 ollama serve
+#  allow request from outside OLLAMA_HOST=0.0.0.0 ollama serve or  "OLLAMA_HOST=0.0.0.0 \ OLLAMA_ORIGINS=* \ ollama serve"
