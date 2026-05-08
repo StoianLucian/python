@@ -29,10 +29,11 @@ def chat(body: ChatRequest = Body(...)):
 
     def generate():
         stream = client.generate(
-            model="deepseek-r1:1.5b",
+            model="qwen3:8b",
             prompt=prompt,
             stream=True
         )
+        # model="deepseek-r1:1.5b",
         for chunk in stream:
 
             response = chunk.get("response")
