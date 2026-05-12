@@ -21,35 +21,6 @@ class ChatRequest(BaseModel):
     model: str
 
 
-@router.post("/")
-def chat(body: ChatRequest):
-    prompt = body.prompt
-    model = body.model
-    logging.info(f"aiChat.chat prompt: {prompt}")
-
-    def generate():
-        stream = initialize_model(model, prompt, True)
-
-        for chunk in stream:
-
-            response = chunk.get("response")
-            thinking = chunk.get("thinking")
-
-            if response is not None or thinking is not None:
-                yield json.dumps({
-                    "response": response,
-                    "thinking": thinking,
-                }) + "\n"
-
-            if chunk.get("done"):
-                break
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/plain"
-    )
-
-
 modelUrl = os.getenv("MODEL_URL")
 
 client = Client(
@@ -67,16 +38,38 @@ class ChatRequestTest(BaseModel):
     model: str
 
 
-@router.post("/test")
+@router.post("/")
 def chat(body: ChatRequestTest):
+    messages = body.messages
+    model = body.model
 
-    response = client.chat(
-        model=body.model,
-        messages=[m.model_dump() for m in body.messages],
-        stream=False
+    def generate():
+        stream = client.chat(
+            model=model,
+            messages=[m.model_dump() for m in messages],
+            stream=True
+        )
+
+        for chunk in stream:
+
+            content = chunk.get("message", {}).get("content")
+            thinking = chunk.get("message", {}).get("thinking")
+            isDone = chunk.get("done")
+
+            if content or thinking:
+                yield json.dumps({
+                    "content": content,
+                    "thinking": thinking,
+                    "done": isDone
+                }) + "\n"
+
+            if chunk.get("done"):
+                break
+
+    return StreamingResponse(
+        generate(),
+        media_type="application/x-ndjson"
     )
-
-    return response
 
 
 class ChatRequest(BaseModel):
