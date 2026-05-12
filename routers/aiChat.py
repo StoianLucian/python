@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Body, Depends, HTTPException
-from repositories.aiChat_repository import initialize_model
+from repositories.aiChat_repository import initialize_model_chat, initialize_model_generate, pingOptions, return_available_models
 from schemas import *
 from fastapi.responses import StreamingResponse
 import logging
@@ -44,11 +44,7 @@ def chat(body: ChatRequestTest):
     model = body.model
 
     def generate():
-        stream = client.chat(
-            model=model,
-            messages=[m.model_dump() for m in messages],
-            stream=True
-        )
+        stream = initialize_model_chat(model, messages, True)
 
         for chunk in stream:
 
@@ -78,14 +74,24 @@ class ChatRequest(BaseModel):
 
 @router.post("/ping")
 def chat(body: ChatRequest):
-    prompt = "Only return true if you are online"
     model = body.model
 
     try:
-        response = initialize_model(model, prompt, False)
+        response = initialize_model_generate(model, "Ping", False, pingOptions)
+
+        return_models()
         if not response.get("response"):
             return False
 
         return True
+    except Exception as e:
+        raise e
+
+
+@router.get("/models")
+def return_models():
+    try:
+        models = return_available_models()
+        return models
     except Exception as e:
         raise e
