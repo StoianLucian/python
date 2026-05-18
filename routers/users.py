@@ -19,6 +19,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
 
         return created_user
     except Exception as e:
+        db.rollback()
         raise e
 
 

@@ -77,6 +77,7 @@ async def create_file(
     except Exception as e:
         if os.path.exists(file_path):
             os.remove(file_path)
+        db.rollback()
         raise e
 
 

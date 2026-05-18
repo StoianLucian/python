@@ -66,3 +66,11 @@ class EmptyPDFFileError(AppError):
             error_code="pdf_file_empty",
             status_code=400
         )
+        
+class SessionNotFound(AppError):
+    def __init__(self):
+        super().__init__(
+            message="Session not found",
+            error_code="session_not_found",
+            status_code=404
+        )

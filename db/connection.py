@@ -2,9 +2,16 @@
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from db.schemas.Base import Base
 
 from config.db_config import DB_CONFIG
 from dotenv import load_dotenv
+
+
+from db.schemas.ChatSession import ChatSession
+from db.schemas.ChatMessage import ChatMessage
+from db.schemas.file import File
+from db.schemas.user import User
 
 DATABASE_URL = (
     f"postgresql://{DB_CONFIG['user']}:{DB_CONFIG['password']}"
@@ -17,6 +24,8 @@ load_dotenv()
 DB_URL = os.getenv("DB_URL")
 
 engine = create_engine(DB_URL, pool_pre_ping=True)
+
+Base.metadata.create_all(bind=engine)
 
 SessionLocal = sessionmaker(
     autocommit=False,

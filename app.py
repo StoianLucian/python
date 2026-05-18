@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from errors.user import AppError
-from routers import auth, files, users, aiChat
+from routers import ai_chat, auth, files, users, chat_session
 
 import logging
 
@@ -49,5 +49,6 @@ app.include_router(auth.router)
 # /files
 app.include_router(files.router)
 # /chat
-app.include_router(aiChat.router)
-
+app.include_router(ai_chat.router)
+# /session
+app.include_router(chat_session.router)
