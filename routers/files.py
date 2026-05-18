@@ -83,7 +83,7 @@ async def create_file(
 @router.get("/")
 async def get_files(user=Depends(check_token), db: Session = Depends(get_db)):
 
-    files = db.query(FileModel).options(load_only(FileModel.file_name, FileModel.id)).filter(
+    files = db.query(FileModel).options(load_only(FileModel.file_name, FileModel.id, FileModel.created_at, FileModel.file_size, FileModel.file_type)).filter(
         FileModel.created_by == user["user_id"]).all()
 
     return files
