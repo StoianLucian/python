@@ -14,6 +14,8 @@ class ChatSession(Base):
     title: Mapped[str] = mapped_column(String, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(Date, nullable=False)
+    
+    created_by: Mapped[int] = mapped_column(Integer, nullable=False)
 
     chat_messages: Mapped[List["ChatMessage"]] = relationship(
         "ChatMessage",
