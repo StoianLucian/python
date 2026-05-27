@@ -1,14 +1,12 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 from db.connection import get_db
 from dto.session.session import CreateSession
-from repositories import login_user_db, logout_user_db
+from errors.chat import SummaryNotCreatedError
 from errors.user import SessionNotFound
 
-from repositories.aiChat_repository import initialize_model_generate, return_smallest_model
 from repositories.auth_repository import LoginRequest, check_token
 from repositories.chat_session_repository import create_session_db, create_session_summary, get_user_session_by_id, get_user_sessions, session_summary_prompt
 
@@ -22,7 +20,7 @@ def create_session(data: CreateSession, db: Session = Depends(get_db), user=Depe
 
         session_summary = create_session_summary(query)
         if not session_summary:
-            return "no summary created"
+            raise SummaryNotCreatedError()
 
         session = create_session_db(session_summary, user["user_id"])
         db.add(session)
@@ -33,7 +31,7 @@ def create_session(data: CreateSession, db: Session = Depends(get_db), user=Depe
 
     except Exception as e:
         db.rollback()
-        raise SessionNotFound()
+        raise e
 
 
 @router.get("/")

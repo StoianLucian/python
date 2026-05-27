@@ -1,6 +1,7 @@
 from datetime import datetime
 from db.schemas.ChatSession import ChatSession
 from sqlalchemy.orm import Session, selectinload
+from errors.user import SessionNotFound
 from repositories.aiChat_repository import initialize_model_generate, return_smallest_model, session_summary_options, session_summary_prompt
 
 
@@ -62,3 +63,8 @@ def create_session_db(title: str, userId: int):
     )
 
     return session
+
+def check_session_exists(session_id: int, db: Session):
+    session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    if not session:
+        raise SessionNotFound()

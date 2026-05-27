@@ -1,9 +1,8 @@
-#  // run virtual enviroment "source venv/bin/activate"
-# // run server:  "uvicorn app:app --reload"
+#  // run virtual enviroment + run server "source venv/bin/activate && uvicorn app:app --reload"
 # // run migrations: "alembic upgrade head"
 #             -> run specific folder migration alembic -c folder_name/alembic.ini upgrade head
 #  // create migration alembic revision -m "create_users_table"
 #              -> create specific folder migration ex: alembic -c folder_name/alembic.ini revision -m "migration_name"
 
 #  start ai "ngrok http 11434"
-#  allow request from outside OLLAMA_HOST=0.0.0.0 ollama serve or  "OLLAMA_HOST=0.0.0.0 \ OLLAMA_ORIGINS=* \ ollama serve"
+#  allow request from outside OLLAMA_HOST=0.0.0.0 ollama serve or  "OLLAMA_HOST=0.0.0.0 OLLAMA_ORIGINS=* ollama serve"
