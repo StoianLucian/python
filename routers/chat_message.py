@@ -20,9 +20,6 @@ router = APIRouter(prefix="/message", tags=["chat messages"])
 @router.post("/{session_id}")
 def create_session(session_id: int, data: CreateMessage, db: Session = Depends(get_db), user=Depends(check_token)):
     try:
-        # print(session_id)
-        
-        # return "test"
         check_session_exists(session_id, db)
 
         message = create_message_db(data, session_id, user["user_id"], db)

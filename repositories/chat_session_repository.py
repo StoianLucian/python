@@ -36,6 +36,8 @@ def get_user_session_by_id(session_id, db: Session):
             .filter(ChatSession.id == session_id)
             .first()
         )
+        if session is None:
+            raise SessionNotFound()
 
         return session
     except Exception as e:
@@ -64,7 +66,21 @@ def create_session_db(title: str, userId: int):
 
     return session
 
+
+def delete_session_db(session_id: int, db: Session):
+    try:
+        session = db.query(ChatSession).filter(
+            ChatSession.id == session_id
+        ).first()
+
+        db.delete(session)
+        db.commit()
+    except Exception as e:
+        raise e
+
+
 def check_session_exists(session_id: int, db: Session):
-    session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    session = db.query(ChatSession).filter(
+        ChatSession.id == session_id).first()
     if not session:
         raise SessionNotFound()

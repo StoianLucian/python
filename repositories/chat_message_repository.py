@@ -18,6 +18,7 @@ def create_message_db(data: CreateMessage, session_id: int, userId: int, db: Ses
         message = ChatMessage(
             text=data.content,
             created_at=datetime.now(),
+            role=data.role,
             created_by=userId,
             session_id=session_id
         )

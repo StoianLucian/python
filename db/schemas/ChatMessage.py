@@ -15,6 +15,8 @@ class ChatMessage(Base):
 
     created_at: Mapped[datetime] = mapped_column(Date, nullable=False)
 
+    role: Mapped[str] = mapped_column(String, nullable=False)
+
     created_by: Mapped[int] = mapped_column(Integer, nullable=False)
 
     session_id: Mapped[int] = mapped_column(
