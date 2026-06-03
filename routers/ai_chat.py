@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Body, Depends, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter
 from repositories.aiChat_repository import initialize_model_chat, initialize_model_generate, ping_options, return_available_models
 from schemas import *
 from fastapi.responses import StreamingResponse
@@ -31,6 +33,7 @@ client = Client(
 class Message(BaseModel):
     role: str
     content: str
+    images: Optional[list[str]] = None
 
 
 class ChatRequestTest(BaseModel):
@@ -77,7 +80,8 @@ def chat(body: ChatRequest):
     model = body.model
 
     try:
-        response = initialize_model_generate(model, "Ping", False, ping_options)
+        response = initialize_model_generate(
+            model, "Ping", False, ping_options)
 
         return_models()
         if not response.get("response"):

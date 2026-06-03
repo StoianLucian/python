@@ -53,6 +53,7 @@ def initialize_model_generate(model: str, prompt: str, stream: bool = False, opt
 class Message(BaseModel):
     role: str
     content: str
+    images: Optional[list[str]] = None
 
 
 def initialize_model_chat(model: str, messages: list[Message], stream: bool, options: Optional[dict] = None):
