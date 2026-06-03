@@ -14,7 +14,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/login")
 def login_user(loginData: LoginRequest, response: Response, db: Session = Depends(get_db)):
-    logging.info(f"auth.login_user: {loginData}")
+    logging.info(f"auth.login_user: {loginData.account}")
     return login_user_db(loginData, response, db)
 
 

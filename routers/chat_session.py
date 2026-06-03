@@ -1,14 +1,11 @@
-from datetime import datetime
-
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 from db.connection import get_db
-from dto.session.session import CreateSession
+from dto.session.session import CreateSession, UpdateSession
 from errors.chat import SummaryNotCreatedError
-from errors.user import SessionNotFound
 
 from repositories.auth_repository import LoginRequest, check_token
-from repositories.chat_session_repository import create_session_db, create_session_summary, delete_session_db, get_user_session_by_id, get_user_sessions, session_summary_prompt
+from repositories.chat_session_repository import create_session_db, create_session_summary, delete_session_db, get_user_session_by_id, get_user_sessions, session_summary_prompt, update_session_title_db
 
 router = APIRouter(prefix="/session",
                    tags=["chat session"],
@@ -31,25 +28,25 @@ def create_session(data: CreateSession, db: Session = Depends(get_db), user=Depe
 
         return session.id
 
-    except Exception as e:
+    except Exception:
         db.rollback()
-        raise e
+        raise
 
 
 @router.get("/")
 def get_sessions(db=Depends(get_db), user=Depends(check_token)):
     try:
         return get_user_sessions(db, user["user_id"])
-    except Exception as e:
-        raise e
+    except Exception:
+        raise
 
 
 @router.get("/{session_id}")
 def get_session(session_id: int, db: Session = Depends(get_db), user=Depends(check_token)):
     try:
         return get_user_session_by_id(session_id, db)
-    except Exception as e:
-        raise e
+    except Exception:
+        raise
 
 
 @router.delete("/{session_id}")
@@ -59,6 +56,18 @@ def delete_session(session_id: int, db: Session = Depends(get_db), user=Depends(
 
         return {"success": True, "message": "Session deleted successfully"}
 
-    except Exception as e:
+    except Exception:
         db.rollback()
-        raise e
+        raise
+
+
+@router.put("/{session_id}")
+def update_session(session_id: int, updateData: UpdateSession, db: Session = Depends(get_db), user=Depends(check_token)):
+    try:
+        update_session_title_db(session_id, updateData.title, db)
+
+        return {"success": True, "message": "Session updated successfully"}
+
+    except Exception:
+        db.rollback()
+        raise

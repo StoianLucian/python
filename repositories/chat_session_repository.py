@@ -28,6 +28,9 @@ def create_session_summary(prompt: str):
 def get_user_session_by_id(session_id, db: Session):
 
     try:
+
+        check_session_exists(session_id, db)
+
         session = (
             db.query(ChatSession)
             .options(
@@ -36,8 +39,6 @@ def get_user_session_by_id(session_id, db: Session):
             .filter(ChatSession.id == session_id)
             .first()
         )
-        if session is None:
-            raise SessionNotFound()
 
         return session
     except Exception as e:
@@ -69,6 +70,9 @@ def create_session_db(title: str, userId: int):
 
 def delete_session_db(session_id: int, db: Session):
     try:
+
+        check_session_exists(session_id, db)
+
         session = db.query(ChatSession).filter(
             ChatSession.id == session_id
         ).first()
@@ -84,3 +88,25 @@ def check_session_exists(session_id: int, db: Session):
         ChatSession.id == session_id).first()
     if not session:
         raise SessionNotFound()
+
+
+def update_session_title_db(session_id: int, new_title: str, db: Session):
+    try:
+
+        check_session_exists(session_id, db)
+
+        session = db.query(ChatSession).filter(
+            ChatSession.id == session_id
+        ).first()
+
+        if not session:
+            raise SessionNotFound()
+
+        session.title = new_title
+        db.commit()
+        db.refresh(session)
+
+        return session
+
+    except Exception as e:
+        raise e
