@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import List
 
 from sqlalchemy import Date, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -22,4 +23,10 @@ class ChatMessage(Base):
     session_id: Mapped[int] = mapped_column(
         ForeignKey("chat_sessions.id"),
         nullable=False
+    )
+
+    images: Mapped[List["Image"]] = relationship(
+        "Image",
+        order_by="Image.id",
+        cascade="all, delete-orphan",
     )

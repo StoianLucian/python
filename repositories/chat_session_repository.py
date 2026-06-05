@@ -1,4 +1,5 @@
 from datetime import datetime
+from db.schemas import ChatMessage
 from db.schemas.ChatSession import ChatSession
 from sqlalchemy.orm import Session, selectinload
 from errors.user import SessionNotFound
@@ -35,6 +36,7 @@ def get_user_session_by_id(session_id, db: Session):
             db.query(ChatSession)
             .options(
                 selectinload(ChatSession.chat_messages)
+                .selectinload(ChatMessage.images)
             )
             .filter(ChatSession.id == session_id)
             .first()
