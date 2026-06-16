@@ -54,6 +54,13 @@ class Message(BaseModel):
     role: str
     content: str
     images: Optional[list[str]] = None
+    
+def get_embedding(text: str, model):
+    response = client.embeddings(
+        model=model,
+        prompt=text
+    )
+    return response["embedding"]
 
 
 def initialize_model_chat(model: str, messages: list[Message], stream: bool, options: Optional[dict] = None):
@@ -82,6 +89,22 @@ def return_available_models():
             "id": m["model"]
         }
         for m in models["models"]
+        if "embed" not in m["model"].lower()
+    ]
+
+    return model_names
+
+
+def return_available_embedding_models():
+    models = client.list()
+
+    model_names = [
+        {
+            "name": m["name"],
+            "id": m["model"]
+        }
+        for m in models["models"]
+        if "embed" in m["model"].lower()
     ]
 
     return model_names

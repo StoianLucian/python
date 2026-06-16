@@ -10,6 +10,7 @@ import pdfplumber
 from db.schemas.file import File as FileModel
 
 from errors.user import EmptyPDFFileError, PDFFileSupportedError
+from repositories.aiChat_repository import get_embedding, return_available_embedding_models
 from repositories.files_repository import upload_file_db
 from repositories.auth_repository import check_token
 from db.connection import get_db
@@ -25,11 +26,17 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def extract_text_from_pdf(file_path: str) -> str:
     text = ""
+    embedding_model = return_available_embedding_models()
+
     with pdfplumber.open(file_path) as pdf:
         for page in pdf.pages:
             page_text = page.extract_text()
             if page_text:
                 text += page_text + "\n"
+
+    embedding = get_embedding(text=text, model=embedding_model)
+
+    print(embedding, " =====================")
     return text
 
 
@@ -66,7 +73,37 @@ async def create_file(
         )
 
         # ✅ EXTRACT TEXT
-        text = extract_text_from_pdf(file_path)
+        # text = extract_text_from_pdf(file_path)
+
+        embedding_models = return_available_embedding_models()
+
+        with pdfplumber.open(file_path) as pdf:
+            for page_index, page in enumerate(pdf.pages):
+                page_text = page.extract_text()
+
+                if not page_text:
+                    continue
+
+                lines = page_text.split("\n")
+
+                page_title = lines[0] if lines else None
+
+                for line_index, line in enumerate(lines):
+                    if not line.strip():
+                        continue
+
+                    chunk = {
+                        "page_number": page_index + 1,
+                        "page_title": page_title,
+                        "row_index": line_index,
+                        "text": line
+                    }
+
+                    print(chunk)
+
+        embedding = get_embedding(text=text, model=embedding_models[0]["name"])
+
+        print(embedding, " =====================")
 
         return {
             "filename": filename,
