@@ -1,7 +1,7 @@
 from typing import Optional
 
 from fastapi import APIRouter
-from repositories.aiChat_repository import initialize_model_chat, initialize_model_generate, ping_options, return_available_models
+from repositories.aiChat_repository import get_embedding, initialize_model_chat, initialize_model_generate, ping_options, return_available_embedding_models, return_available_models
 from schemas import *
 from fastapi.responses import StreamingResponse
 import logging
@@ -45,6 +45,15 @@ class ChatRequestTest(BaseModel):
 def chat(body: ChatRequestTest):
     messages = body.messages
     model = body.model
+
+    last_message = messages[-1].content
+    embedding_models = return_available_embedding_models()
+    embedding = get_embedding(
+        text=last_message,
+        model=embedding_models[0]["name"]
+    )
+    
+    messages[-1].content = "modified value"
 
     def generate():
         stream = initialize_model_chat(model, messages, True)

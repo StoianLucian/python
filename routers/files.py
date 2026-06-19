@@ -10,10 +10,12 @@ import pdfplumber
 from db.schemas.file import File as FileModel
 
 from errors.user import EmptyPDFFileError, PDFFileSupportedError
+from helpers.helpers import split_text
 from repositories.aiChat_repository import get_embedding, return_available_embedding_models
 from repositories.files_repository import upload_file_db
 from repositories.auth_repository import check_token
 from db.connection import get_db
+from repositories.aiChat_repository import create_chunk
 
 router = APIRouter(
     prefix="/files",
@@ -34,9 +36,6 @@ def extract_text_from_pdf(file_path: str) -> str:
             if page_text:
                 text += page_text + "\n"
 
-    embedding = get_embedding(text=text, model=embedding_model)
-
-    print(embedding, " =====================")
     return text
 
 
@@ -62,8 +61,7 @@ async def create_file(
         with open(file_path, "wb") as buffer:
             buffer.write(content)
 
-        # ✅ STORE IN DB
-        upload_file_db(
+        file = upload_file_db(
             filename,
             storage_key,
             len(content),  # safer than file.size
@@ -72,10 +70,9 @@ async def create_file(
             db
         )
 
-        # ✅ EXTRACT TEXT
-        # text = extract_text_from_pdf(file_path)
-
         embedding_models = return_available_embedding_models()
+
+        chunks = []
 
         with pdfplumber.open(file_path) as pdf:
             for page_index, page in enumerate(pdf.pages):
@@ -92,23 +89,27 @@ async def create_file(
                     if not line.strip():
                         continue
 
-                    chunk = {
-                        "page_number": page_index + 1,
-                        "page_title": page_title,
-                        "row_index": line_index,
-                        "text": line
-                    }
+                    for part_index, part in enumerate(split_text(line.strip(), 50)):
+                        embedding = get_embedding(
+                            text=part,
+                            model=embedding_models[0]["name"]
+                        )
+                        chunk = {
+                            "page_number": page_index + 1,
+                            "page_title": page_title,
+                            "row_index": line_index,
+                            "chunk_index": part_index,
+                            "content": part,
+                            "embedding": embedding,
+                        }
 
-                    print(chunk)
+                        chunks.append(chunk)
 
-        embedding = get_embedding(text=text, model=embedding_models[0]["name"])
-
-        print(embedding, " =====================")
-
+        create_chunk(chunks, file.id, user["user_id"], db)
         return {
             "filename": filename,
             "size": len(content),
-            "preview": text[:200]
+            # "preview": text[:200]
         }
 
     except Exception as e:
