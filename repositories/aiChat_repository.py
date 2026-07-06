@@ -72,18 +72,22 @@ def initialize_model_chat(model: str, messages: list[Message], stream: bool, opt
 
 
 def return_available_models():
-    models = client.list()
 
-    model_names = [
-        {
-            "name": m["name"],
-            "id": m["model"]
-        }
-        for m in models["models"]
-        if "embed" not in m["model"].lower()
-    ]
+    try:
+        models = client.list()
 
-    return model_names
+        model_names = [
+            {
+                "name": m["name"],
+                "id": m["model"]
+            }
+            for m in models["models"]
+            if "embed" not in m["model"].lower()
+        ]
+
+        return model_names
+    except Exception as e:
+        raise e
 
 
 def return_available_embedding_models():
