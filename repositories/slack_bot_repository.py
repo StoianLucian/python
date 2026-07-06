@@ -3,6 +3,7 @@ import logging
 
 from repositories.aiChat_repository import initialize_model_generate, return_available_models
 from prompts.prompts import slack_bot_prompt
+from slack_sdk.errors import SlackApiError
 
 
 def return_slack_response(slack_message, slack_user: str, history):
@@ -32,7 +33,7 @@ def return_slack_response(slack_message, slack_user: str, history):
 
         response = reponse_summary.get('response')
 
-    except Exception as e:
+    except SlackApiError as e:
         logging.info('slack_bot_repository.return_slack_response')
         print(f"error accessing slack bot {e}")
         return "error accessing slack bot"
@@ -40,17 +41,22 @@ def return_slack_response(slack_message, slack_user: str, history):
     return response
 
 
-def add_reaction(client, event, emoji = ["robot_face"]):
-    emoji = emoji
-    try:
-        client.reactions_add(
-            channel=event["channel"],
-            timestamp=event["ts"],
-            name=emoji
-        )
+def handle_reaction(client, event, add=True, emojis=None):
 
-    except SlackApiError as e:
-        print(f"Error adding {emoji}: {e.response['error']}")
+    if emojis is None:
+        emojis = ["robot_face"]
+
+    action = getattr(client, "reactions_add" if add else "reactions_remove")
+
+    for emoji in emojis:
+        try:
+            action(
+                channel=event["channel"],
+                timestamp=event["ts"],
+                name=emoji
+            )
+        except Exception as e:
+            print(f"Failed to add {emoji}: {e}")
 
 
 def is_tag_message(id, content):

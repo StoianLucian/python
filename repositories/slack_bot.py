@@ -1,5 +1,5 @@
 import os
-from repositories.slack_bot_repository import is_tag_message, return_slack_response
+from repositories.slack_bot_repository import handle_reaction, is_tag_message, return_slack_response
 from slack_bolt import App
 from slack_bolt.adapter.fastapi import SlackRequestHandler
 
@@ -24,11 +24,15 @@ def handle_mention(event, client, say):
     slack_user = event["user"]
     slack_chanel = event["channel"]
 
+    handle_reaction(client, event)
+
     history = client.conversations_history(channel=slack_chanel, limit=10)
 
     response = return_slack_response(slack_content, slack_user, history)
 
     say(f"{response}")
+
+    handle_reaction(client, event, emojis=["white_check_mark"])
 
 
 @slack_app.event("message")
@@ -45,8 +49,12 @@ def handle_message(event, say, client):
     if event.get("channel_type") != "channel":
         return
 
+    handle_reaction(client, event)
+
     history = client.conversations_history(channel=slack_chanel, limit=10)
 
     response = return_slack_response(slack_content, slack_user, history)
 
     say(f"{response}")
+
+    handle_reaction(client, event, emojis=["white_check_mark"])
