@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 
 from errors.user import AppError
 from routers import ai_chat, auth, chat_message, files, users, chat_session
+from repositories.slack_bot import handler
 
 import logging
 
@@ -41,6 +42,12 @@ async def app_error_handler(request: Request, exc: AppError):
             "errorCode": exc.error_code
         },
     )
+
+
+@app.post("/slack/events")
+async def slack_events(request: Request):
+    print("fired slack events")
+    return await handler.handle(request)
 
 # /users
 app.include_router(users.router)

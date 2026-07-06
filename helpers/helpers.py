@@ -1,5 +1,13 @@
+import re
+
 from fastapi import HTTPException
 from enum import Enum
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from db.schemas.chunk import Chunk
+from repositories.aiChat_repository import get_embedding, return_available_embedding_models
 
 
 def raise_error(status: int, message: str, code: Enum):
@@ -11,6 +19,37 @@ def raise_error(status: int, message: str, code: Enum):
         }
     )
 
-def split_text(text, chunk_size=50):
-    text = text.strip()
-    return [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
+
+def return_context(context: str, db: Session):
+    embedding_models = return_available_embedding_models()
+    embedding = get_embedding(
+        text=context,
+        model=embedding_models[0]["name"]
+    )
+
+    stmt = (
+        select(Chunk.document_id, Chunk.content, Chunk.page_number)
+        .order_by(Chunk.embedding.op("<=>")(embedding))
+        .limit(10)
+    )
+
+    results = db.execute(stmt).all()
+
+    data = []
+
+    for doc_id, content, page_number in results:
+        data.append({"id": doc_id, "content": content,
+                    "page_number": page_number})
+
+    return data
+
+
+def split_sentences(text):
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    return [s.strip() for s in sentences if s.strip()]
+
+
+def sanitize_input(text):
+    page_text = text.replace("\n", " ")
+    page_text = re.sub(r"\s+", " ", page_text).strip()
+    return page_text

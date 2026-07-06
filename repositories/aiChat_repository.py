@@ -28,20 +28,6 @@ session_summary_options = {
     "keep_alive": "1m"
 }
 
-session_summary_prompt = """
-You are an assistant that creates concise conversation titles.
-
-Instructions:
-- Generate a very short summary of the user's prompt.
-- Maximum 6 words.
-- Return only the summary.
-- Do not use quotes or punctuation unless necessary.
-- Focus on the main intent/topic.
-
-User prompt:
-{user_prompt}
-"""
-
 
 def initialize_model_generate(model: str, prompt: str, stream: bool = False, options: Optional[dict] = None):
     response = client.generate(

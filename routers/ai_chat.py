@@ -1,13 +1,17 @@
 from typing import Optional
 
-from fastapi import APIRouter
-from repositories.aiChat_repository import get_embedding, initialize_model_chat, initialize_model_generate, ping_options, return_available_embedding_models, return_available_models
+from fastapi import APIRouter, Depends
+from db.connection import get_db
+from db.schemas.chunk import Chunk
+from helpers.helpers import return_context
+from repositories.aiChat_repository import initialize_model_chat, initialize_model_generate, ping_options, return_available_models
+from prompts.prompts import rag_prompt
 from schemas import *
 from fastapi.responses import StreamingResponse
-import logging
 import json
 from ollama import Client
 import os
+from sqlalchemy import select
 
 
 from repositories import *
@@ -42,18 +46,30 @@ class ChatRequestTest(BaseModel):
 
 
 @router.post("/")
-def chat(body: ChatRequestTest):
+def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
     messages = body.messages
     model = body.model
 
     last_message = messages[-1].content
-    embedding_models = return_available_embedding_models()
-    embedding = get_embedding(
-        text=last_message,
-        model=embedding_models[0]["name"]
-    )
-    
-    messages[-1].content = "modified value"
+
+    context = return_context(last_message, db)
+
+    test_prompt = rag_prompt.format(
+        context=context, user_question=last_message)
+
+    messages = [
+        {
+            "role": "system",
+            "content": test_prompt
+        },
+        *[
+            {
+                "role": m.role,
+                "content": m.content
+            }
+            for m in body.messages
+        ]
+    ]
 
     def generate():
         stream = initialize_model_chat(model, messages, True)

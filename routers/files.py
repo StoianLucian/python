@@ -1,16 +1,12 @@
 import os
 import uuid
-
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, load_only
-
 import pdfplumber
-
 from db.schemas.file import File as FileModel
-
 from errors.user import EmptyPDFFileError, PDFFileSupportedError
-from helpers.helpers import split_text
+from helpers.helpers import sanitize_input, split_sentences
 from repositories.aiChat_repository import get_embedding, return_available_embedding_models
 from repositories.files_repository import upload_file_db
 from repositories.auth_repository import check_token
@@ -28,7 +24,6 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def extract_text_from_pdf(file_path: str) -> str:
     text = ""
-    embedding_model = return_available_embedding_models()
 
     with pdfplumber.open(file_path) as pdf:
         for page in pdf.pages:
@@ -37,6 +32,23 @@ def extract_text_from_pdf(file_path: str) -> str:
                 text += page_text + "\n"
 
     return text
+
+
+def build_chunks(sentences, chunk_size=3, overlap=1):
+    chunks = []
+
+    step = chunk_size - overlap
+
+    for i in range(0, len(sentences), step):
+        chunk = sentences[i:i + chunk_size]
+
+        if chunk:
+            chunks.append(chunk)
+
+        if len(chunk) < chunk_size:
+            break
+
+    return chunks
 
 
 @router.post("/")
@@ -64,7 +76,7 @@ async def create_file(
         file = upload_file_db(
             filename,
             storage_key,
-            len(content),  # safer than file.size
+            len(content),
             file.content_type,
             user["user_id"],
             db
@@ -81,35 +93,33 @@ async def create_file(
                 if not page_text:
                     continue
 
-                lines = page_text.split("\n")
+                sentences = split_sentences(sanitize_input(page_text))
+                sentence_chunks = build_chunks(sentences)
 
-                page_title = lines[0] if lines else None
+                page_title = sentences[0] if sentences else None
 
-                for line_index, line in enumerate(lines):
-                    if not line.strip():
-                        continue
+                for chunk_index, chunk_sentence in enumerate(sentence_chunks):
+                    content = " ".join(chunk_sentence)
 
-                    for part_index, part in enumerate(split_text(line.strip(), 50)):
-                        embedding = get_embedding(
-                            text=part,
-                            model=embedding_models[0]["name"]
-                        )
-                        chunk = {
-                            "page_number": page_index + 1,
-                            "page_title": page_title,
-                            "row_index": line_index,
-                            "chunk_index": part_index,
-                            "content": part,
-                            "embedding": embedding,
-                        }
+                    embedding = get_embedding(
+                        text=content,
+                        model=embedding_models[0]["name"]
+                    )
 
-                        chunks.append(chunk)
+                    chunk = {
+                        "page_number": page_index + 1,
+                        "page_title": page_title,
+                        "chunk_index": chunk_index,
+                        "content": content,
+                        "embedding": embedding,
+                    }
 
+                    chunks.append(chunk)
         create_chunk(chunks, file.id, user["user_id"], db)
+
         return {
             "filename": filename,
-            "size": len(content),
-            # "preview": text[:200]
+            "size": len(content)
         }
 
     except Exception as e:

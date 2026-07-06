@@ -39,8 +39,6 @@ def create_image_message_db(images: list[str], message_id: str, db: Session):
 
         db.add_all(image_objects)
         db.commit()
-        
-        print("image saved -----------------")
 
         return image_objects
     except Exception:

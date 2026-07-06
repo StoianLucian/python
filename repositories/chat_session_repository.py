@@ -3,7 +3,8 @@ from db.schemas import ChatMessage
 from db.schemas.ChatSession import ChatSession
 from sqlalchemy.orm import Session, selectinload
 from errors.user import SessionNotFound
-from repositories.aiChat_repository import initialize_model_generate, return_smallest_model, session_summary_options, session_summary_prompt
+from repositories.aiChat_repository import initialize_model_generate, return_smallest_model, session_summary_options
+from prompts.prompts import session_summary_prompt
 
 
 def create_session_summary(prompt: str):
@@ -12,8 +13,6 @@ def create_session_summary(prompt: str):
         user_prompt=prompt)
 
     model = return_smallest_model()
-
-    print("samllest", model)
 
     session_summary = initialize_model_generate(
         model, final_prompt, False, session_summary_options)
