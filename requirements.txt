@@ -14,3 +14,7 @@ SQLAlchemy==2.0.49
 uvicorn[standard]==0.44.0
 requests==2.32.3
 ollama==0.1.7
+
+# Slack
+slack-bolt==1.25.0
+slack-sdk==3.36.0
