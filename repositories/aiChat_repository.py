@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from ollama import Client
+from ollama import Client, ResponseError
 import os
 
 from pydantic import BaseModel
@@ -15,19 +15,39 @@ client = Client(
     host=modelUrl
 )
 
-# options used to ping model faster
-ping_options = {
-    "temperature": 0,
-    "num_predict": 1,
-    "keep_alive": "1m"
-}
-
 session_summary_options = {
     "temperature": 0,
     "top_p": 0.8,
     "keep_alive": "1m"
 }
 
+# def send_email(user: str):
+#     print(f"email semt to {user}")
+    
+# def get_weather(city: str) -> str:
+#     print(city, "get_weather")
+    
+#     return f"It's sunny in {city}."
+    
+    
+# TOOLS = [
+#     send_email,
+#     get_weather,
+# ]
+
+# FUNCTIONS = {
+#     tool.__name__: tool
+#     for tool in TOOLS
+# }
+
+def is_model_installed(model_name: str) -> bool:
+    try:
+        client.show(model_name)
+        return True
+    except ResponseError as e:
+        print(e)
+        return False
+    
 
 def initialize_model_generate(model: str, prompt: str, stream: bool = False, options: Optional[dict] = None):
     response = client.generate(

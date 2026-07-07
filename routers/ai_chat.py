@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from db.connection import get_db
 from db.schemas.chunk import Chunk
 from helpers.helpers import return_context
-from repositories.aiChat_repository import initialize_model_chat, initialize_model_generate, ping_options, return_available_models
+from repositories.aiChat_repository import initialize_model_chat, is_model_installed, return_available_models
 from prompts.prompts import rag_prompt
 from schemas import *
 from fastapi.responses import StreamingResponse
@@ -103,16 +103,9 @@ class ChatRequest(BaseModel):
 @router.post("/ping")
 def chat(body: ChatRequest):
     model = body.model
-
+  
     try:
-        response = initialize_model_generate(
-            model, "Ping", False, ping_options)
-
-        return_models()
-        if not response.get("response"):
-            return False
-
-        return True
+        return is_model_installed(model)
     except Exception as e:
         raise e
 
