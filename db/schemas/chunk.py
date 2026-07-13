@@ -17,5 +17,4 @@ class Chunk(Base):
     content: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(Date, nullable=False)
     created_by: Mapped[int] = mapped_column(Integer, nullable=False)
-
-    embedding: Mapped[list[float]] = mapped_column(Vector(768))  # example dim
+    embedding: Mapped[list[float]] = mapped_column(Vector(768))

@@ -11,7 +11,6 @@ from fastapi.responses import StreamingResponse
 import json
 from ollama import Client
 import os
-from sqlalchemy import select
 
 
 from repositories import *
@@ -72,7 +71,7 @@ def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
     ]
 
     def generate():
-        stream = initialize_model_chat(model, messages, True)
+        stream = initialize_model_chat(model, messages, True, db=db)
 
         for chunk in stream:
 

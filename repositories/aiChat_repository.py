@@ -1,11 +1,14 @@
 from datetime import datetime
 from typing import Any, Optional
 
+from db.connection import get_db
 from ollama import Client, ResponseError
 import os
 
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from db.schemas.user import User
+from difflib import get_close_matches
 
 from db.schemas.chunk import Chunk
 
@@ -21,24 +24,6 @@ session_summary_options = {
     "keep_alive": "1m"
 }
 
-# def send_email(user: str):
-#     print(f"email semt to {user}")
-    
-# def get_weather(city: str) -> str:
-#     print(city, "get_weather")
-    
-#     return f"It's sunny in {city}."
-    
-    
-# TOOLS = [
-#     send_email,
-#     get_weather,
-# ]
-
-# FUNCTIONS = {
-#     tool.__name__: tool
-#     for tool in TOOLS
-# }
 
 def is_model_installed(model_name: str) -> bool:
     try:
@@ -74,21 +59,30 @@ def get_embedding(text: str, model):
     return response["embedding"]
 
 
-def initialize_model_chat(model: str, messages: list[Message], stream: bool, options: Optional[dict] = None):
 
+def initialize_model_chat(model: str, messages: list[Message], stream: bool, options: Optional[dict] = None, db:Session = None):
+    
     parsed_messages = [
-        m.model_dump() if hasattr(m, "model_dump") else m
-        for m in messages
-    ]
+            m.model_dump() if hasattr(m, "model_dump") else m
+            for m in messages
+        ]
+    kwargs = {
+        "model":model,
+        "messages": parsed_messages,
+        "stream": stream,
+        "options": options,
+        # "tools":[send_email_tool, get_weather]
+    }
 
-    chat = client.chat(
-        model=model,
-        messages=parsed_messages,
-        stream=stream,
-        options=options
-    )
-
-    return chat
+    try:
+        chat = client.chat(
+           **kwargs
+        )
+        
+        return chat
+    
+    except Exception as e:
+        raise e
 
 
 def return_available_models():
@@ -98,7 +92,7 @@ def return_available_models():
 
         model_names = [
             {
-                "name": m["name"],
+                "name": m["model"],
                 "id": m["model"]
             }
             for m in models["models"]
@@ -115,7 +109,7 @@ def return_available_embedding_models():
 
     model_names = [
         {
-            "name": m["name"],
+            "name": m["model"],
             "id": m["model"]
         }
         for m in models["models"]
@@ -127,7 +121,7 @@ def return_available_embedding_models():
 
 def return_smallest_model():
     models = return_available_models()
-    return min(models, key=lambda m: int(m['name'].split(':')[1][:-1]))['name']
+    return min(models,key=lambda m: float(m["name"].split(":")[1].rstrip("b")))["name"]
 
 
 def create_chunk(chunk_obj, file_id: int, user_id: int, db: Session):

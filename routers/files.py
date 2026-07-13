@@ -8,10 +8,12 @@ from db.schemas.file import File as FileModel
 from errors.user import EmptyPDFFileError, PDFFileSupportedError
 from helpers.helpers import sanitize_input, split_sentences
 from repositories.aiChat_repository import get_embedding, return_available_embedding_models
-from repositories.files_repository import upload_file_db
+from repositories.files_repository import upload_file_db, reset_files_db
 from repositories.auth_repository import check_token
 from db.connection import get_db
 from repositories.aiChat_repository import create_chunk
+from semantic_text_splitter import TextSplitter
+from db.schemas.chunk import Chunk
 
 router = APIRouter(
     prefix="/files",
@@ -92,29 +94,36 @@ async def create_file(
 
                 if not page_text:
                     continue
+                
+                splitter = TextSplitter(400)
+                
+                split_text = splitter.chunks(sanitize_input(page_text))
+                
+                chunk_sentences = build_chunks(split_text)
 
-                sentences = split_sentences(sanitize_input(page_text))
-                sentence_chunks = build_chunks(sentences)
-
-                page_title = sentences[0] if sentences else None
-
-                for chunk_index, chunk_sentence in enumerate(sentence_chunks):
+                for chunk_index, chunk_sentence in enumerate(chunk_sentences):
                     content = " ".join(chunk_sentence)
+
 
                     embedding = get_embedding(
                         text=content,
                         model=embedding_models[0]["name"]
                     )
 
+                    
                     chunk = {
                         "page_number": page_index + 1,
-                        "page_title": page_title,
+                        "page_title": "some title",
                         "chunk_index": chunk_index,
                         "content": content,
                         "embedding": embedding,
                     }
 
                     chunks.append(chunk)
+                    
+        print(chunks[-1], "----")
+                    
+        # print(chunks)
         create_chunk(chunks, file.id, user["user_id"], db)
 
         return {
@@ -127,7 +136,6 @@ async def create_file(
             os.remove(file_path)
         db.rollback()
         raise e
-
 
 @router.get("/")
 async def get_files(user=Depends(check_token), db: Session = Depends(get_db)):
@@ -164,6 +172,20 @@ async def delete_file(id: int, user=Depends(check_token), db: Session = Depends(
                                       FileModel.created_by == user["user_id"]).first()
     if not file:
         raise HTTPException(status_code=404, detail="File not found")
+    
+    chunk = db.query(chunk)
     db.delete(file)
     db.commit()
     return {"status": "ok"}
+
+@router.delete('/')
+def reset_files(db: Session = Depends(get_db), user = Depends(check_token)):
+    
+    try:
+        result = reset_files_db(db, user["user_id"])
+        
+        if result:
+            return {"status": "ok"}
+    except Exception as e:
+        raise e
+    
