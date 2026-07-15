@@ -25,7 +25,7 @@ def register_document_search_tools(mcp: FastMCP):
             
             print(context, "context")
             
-            return ToolResponse(success=True, result="document test")
+            return ToolResponse(success=True, result=context)
 
         except Exception as e:
             return ToolResponse(success=False, result="Error: {e}}")

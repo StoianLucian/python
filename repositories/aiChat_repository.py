@@ -60,7 +60,7 @@ def get_embedding(text: str, model):
 
 
 
-def initialize_model_chat(model: str, messages: list[Message], stream: bool, options: Optional[dict] = None, db:Session = None):
+def initialize_model_chat(model: str, messages: list[Message], stream: bool, options: Optional[dict] = None, tools: Optional[dict] = None):
     
     parsed_messages = [
             m.model_dump() if hasattr(m, "model_dump") else m
@@ -71,8 +71,10 @@ def initialize_model_chat(model: str, messages: list[Message], stream: bool, opt
         "messages": parsed_messages,
         "stream": stream,
         "options": options,
-        # "tools":[send_email_tool, get_weather]
     }
+    
+    if tools is not None:
+        kwargs["tools"] = tools
 
     try:
         chat = client.chat(
@@ -118,10 +120,22 @@ def return_available_embedding_models():
 
     return model_names
 
-
 def return_smallest_model():
-    models = return_available_models()
-    return min(models,key=lambda m: float(m["name"].split(":")[1].rstrip("b")))["name"]
+    try:
+        models = client.list()["models"]
+
+        # Ignore embedding models
+        models = [
+            m for m in models
+            if "embed" not in m["model"].lower()
+        ]
+
+        smallest = min(models, key=lambda m: m["size"])
+
+        return smallest["model"]
+
+    except Exception as e:
+        raise e
 
 
 def create_chunk(chunk_obj, file_id: int, user_id: int, db: Session):

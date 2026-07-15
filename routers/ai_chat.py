@@ -9,7 +9,8 @@ from prompts.prompts import rag_prompt
 from schemas import *
 from fastapi.responses import StreamingResponse
 import json
-from ollama import Client
+from fastmcp import Client
+from ollama import Client as OllamaClient
 import os
 
 
@@ -28,7 +29,7 @@ class ChatRequest(BaseModel):
 
 modelUrl = os.getenv("MODEL_URL")
 
-client = Client(
+client = OllamaClient(
     host=modelUrl
 )
 
@@ -42,10 +43,12 @@ class Message(BaseModel):
 class ChatRequestTest(BaseModel):
     messages: list[Message]
     model: str
+    
+mcp = Client("http://localhost:8000/mcp")
 
 
 @router.post("/")
-def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
+async def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
     messages = body.messages
     model = body.model
 
@@ -59,7 +62,7 @@ def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
     messages = [
         {
             "role": "system",
-            "content": test_prompt
+            "content": "you are an AI assistant, your job is tu use the provided tools if appropriate to help the users do hes tasks"
         },
         *[
             {
@@ -69,9 +72,63 @@ def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
             for m in body.messages
         ]
     ]
+    
+    async with mcp:
+        tools = await mcp.list_tools()
+
+        ollama_tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description or "",
+                    "parameters": tool.inputSchema,
+                },
+            }
+            for tool in tools
+        ]
+
+        while True:
+           
+            stream = initialize_model_chat(model, messages, False, tools=ollama_tools)
+
+            tools = stream.message.tool_calls
+
+            print("TOOL IN PROGRESS", tools)
+
+            # No more tool calls -> we're done
+            if not tools:
+                print("NO MORE TOOLS")
+                break
+            
+            # messages.append({
+            #     "role": "assistant",
+            #     "content": stream.message.content,
+            #     "tool_calls": [
+            #         tc.model_dump()
+            #         for tc in stream.message.tool_calls
+            #     ],
+            # })
+
+            # Execute each requested tool
+            for tool in tools:
+                tool_name = tool.function.name
+                tool_args = tool.function.arguments
+
+                result = await mcp.call_tool(tool_name, tool_args)
+
+                tool_response = result.structured_content
+
+                messages.append({
+                    "role": "tool",
+                    "name": tool_name,
+                    "content": json.dumps(tool_response),
+                })
+                
+    print("MESSAGES after TOOLS" , messages[-1])
 
     def generate():
-        stream = initialize_model_chat(model, messages, True, db=db)
+        stream = initialize_model_chat(model, messages, True)
 
         for chunk in stream:
 

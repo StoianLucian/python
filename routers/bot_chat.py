@@ -82,8 +82,7 @@ async def chat(body: BotRequest):
 
     async with mcp:
         tools = await mcp.list_tools()
-        
-        print("available tools", tools)
+
 
         ollama_tools = [
             {

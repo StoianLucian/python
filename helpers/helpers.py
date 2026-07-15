@@ -74,10 +74,11 @@ def return_context(context: str, db: Session):
 
     results = db.execute(stmt).all()
 
+
     data = []
 
     for doc_id, content, page_number in results:
-        data.append({"id": doc_id, "content": content,
+        data.append({"document_id": doc_id, "document_content": content,
                     "page_number": page_number})
 
     return data
