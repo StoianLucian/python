@@ -3,12 +3,18 @@ from fastmcp import FastMCP
 from db.schemas.user import User
 from helpers.helpers import return_context_2
 from import_folder.response import ToolResponse
-from schemas.user_schemas import UserBase
+
+from pydantic import BaseModel
+
+class DocumentSearchResposnse(BaseModel):
+    page_number: int
+    source_id: int
+    content: str
 
 def register_document_search_tools(mcp: FastMCP):
 
     @mcp.tool
-    async def document_search(user_query: str) -> ToolResponse[str]:
+    async def document_search(user_query: str) -> ToolResponse[list[DocumentSearchResposnse]]:
         """
             Search the knowledge base for documents relevant to the user's question.
 
@@ -19,11 +25,11 @@ def register_document_search_tools(mcp: FastMCP):
             Args:
                 user_query: The user's natural language question or search query.
         """
+        
+        print("try============")
       
         try:
             context = return_context_2(user_query)
-            
-            print(context, "context")
             
             return ToolResponse(success=True, result=context)
 

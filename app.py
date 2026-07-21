@@ -15,6 +15,7 @@ from routers import (
     users,
     chat_session,
     bot_chat,
+    skills
 )
 from repositories.slack_bot import handler
 
@@ -93,4 +94,5 @@ app.include_router(ai_chat.router)
 app.include_router(chat_session.router)
 app.include_router(chat_message.router)
 app.include_router(bot_chat.router)
+app.include_router(skills.router)
 app.mount("/mcp", mcp_app)

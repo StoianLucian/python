@@ -39,8 +39,8 @@ def return_context_2(context: str):
         
         data = []
 
-        for doc_id, content, page_number in results:
-            data.append({"id": doc_id, "content": content,"page_number": page_number})
+        for source_id, content, page_number in results:
+            data.append({"source_id": source_id, "content": content,"page_number": page_number})
             
         return data
     except Exception as e:

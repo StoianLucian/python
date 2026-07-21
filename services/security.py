@@ -105,10 +105,13 @@ def verify_jwt(token: str) -> dict:
 
 
 def return_user_object(loginData: LoginRequest, db: Session):
+    
+    account = loginData.account
+    
     user = db.query(User).filter(
         or_(
-            User.email == loginData.account,
-            User.username == loginData.account
+            User.email == account,
+            User.username == account
         )).first()
 
     if not user:

@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends
 from db.connection import get_db
 from db.schemas.chunk import Chunk
 from helpers.helpers import return_context
-from repositories.aiChat_repository import initialize_model_chat, is_model_installed, return_available_models
-from prompts.prompts import rag_prompt
+from repositories.aiChat_repository import initialize_model_chat, is_model_installed, return_available_models, return_smallest_model
+from prompts.prompts import rag_prompt, tool_calling_prompt
 from schemas import *
 from fastapi.responses import StreamingResponse
 import json
@@ -55,14 +55,13 @@ async def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
     last_message = messages[-1].content
 
     context = return_context(last_message, db)
-
-    test_prompt = rag_prompt.format(
-        context=context, user_question=last_message)
+    
+    prompt = tool_calling_prompt.format(user_prompt=last_message)
 
     messages = [
         {
             "role": "system",
-            "content": "you are an AI assistant, your job is tu use the provided tools if appropriate to help the users do hes tasks"
+            "content": prompt
         },
         *[
             {
@@ -101,14 +100,17 @@ async def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
                 print("NO MORE TOOLS")
                 break
             
-            # messages.append({
-            #     "role": "assistant",
-            #     "content": stream.message.content,
-            #     "tool_calls": [
-            #         tc.model_dump()
-            #         for tc in stream.message.tool_calls
-            #     ],
-            # })
+            assistant_message = {
+                "role": "assistant",
+                "content": stream.message.content or "",
+            }
+            if stream.message.tool_calls:
+                assistant_message["tool_calls"] = [
+                    tc.model_dump()
+                    for tc in stream.message.tool_calls
+                ]
+
+            messages.append(assistant_message)
 
             # Execute each requested tool
             for tool in tools:
@@ -128,7 +130,12 @@ async def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
     print("MESSAGES after TOOLS" , messages[-1])
 
     def generate():
-        stream = initialize_model_chat(model, messages, True)
+        
+        print("FIRST")
+        smallest_model = return_smallest_model()
+        
+        print("SMALLEST MODEL", smallest_model)
+        stream = initialize_model_chat("gemma4:e4b", messages, True)
 
         for chunk in stream:
 

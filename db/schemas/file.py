@@ -1,8 +1,9 @@
-from sqlalchemy.orm import declarative_base, Mapped, mapped_column
-from sqlalchemy import Float, Integer, String, Date
 from datetime import datetime
 
-Base = declarative_base()
+from sqlalchemy import Date, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from db.schemas.Base import Base
 
 
 class File(Base):
