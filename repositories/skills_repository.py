@@ -22,3 +22,13 @@ def populate_skills(db: Session):
     except Exception as e:
         print("Skills error")
         raise e
+    
+def get_skills_db(db: Session, search: str):
+    
+    if search is not None and search != "":
+        skills = db.query(Skill).filter(Skill.name.ilike(f"%{search}%")).all()
+    else :
+        skills = db.query(Skill).all()
+
+    return skills
+

@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
+from typing import Optional
 from db.connection import get_db
-from repositories.skills_repository import populate_skills
+from repositories.skills_repository import get_skills_db, populate_skills
 from schemas import *
 from sqlalchemy.orm import Session
 
@@ -12,11 +13,7 @@ router = APIRouter(
 )
 
 @router.get("/")
-def get_all_users(user=Depends(check_token), db: Session = Depends(get_db)):
-    try:
-        users = populate_skills(db)
-        return users
-    except Exception as e:
-        raise e
+def get_skills(search_term: Optional[str] = Query(None),  user=Depends(check_token), db: Session = Depends(get_db)):
+    return get_skills_db(db, search_term)
 
 
