@@ -249,18 +249,18 @@ Every object MUST contain a "type" field.
 
 Allowed object types:
 
-Message
+Text
 
 {{
-    "type": "message",
-    "content": "string"
+    "type": "text",
+    "text": "string"
 }}
 
 Popover
 
 {{
     "type": "popover",
-    "content": "string",
+    "text": "string",
     "source_id": "string",
     "page_number": "string"
 }}
@@ -269,16 +269,16 @@ Error
 
 {{
     "type": "error",
-    "content": "string"
+    "text": "string"
 }}
 
 ==================================================
 MESSAGE RULES
 ==================================================
 
-- Every user-facing response MUST contain at least one "message" object unless returning an error.
+- Every user-facing response MUST contain at least one "text" object unless returning an error.
 - Keep responses concise.
-- Never include citations, source IDs, or page numbers inside a message.
+- Never include citations, source IDs, or page numbers inside a text.
 
 ==================================================
 POPOVER RULES
@@ -301,12 +301,12 @@ Example:
 
 [
     {{
-        "type": "message",
-        "content": "Employees receive 21 days of annual leave."
+        "type": "text",
+        "text": "Employees receive 21 days of annual leave."
     }},
     {{
         "type": "popover",
-        "content": "Annual Leave Policy",
+        "text": "Annual Leave Policy",
         "source_id": "15",
         "page_number": 20
     }}
@@ -347,7 +347,7 @@ Example:
 [
     {{
         "type": "error",
-        "content": "Unable to fulfill the request."
+        "text": "Unable to fulfill the request."
     }}
 ]
 

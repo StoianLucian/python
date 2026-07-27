@@ -12,7 +12,7 @@ import json
 from fastmcp import Client
 from ollama import Client as OllamaClient
 import os
-
+from skills import AVAILABLE_SKILLS
 
 from repositories import *
 
@@ -51,6 +51,8 @@ mcp = Client("http://localhost:8000/mcp")
 async def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
     messages = body.messages
     model = body.model
+    
+    print(AVAILABLE_SKILLS, "===============")
 
     last_message = messages[-1].content
 

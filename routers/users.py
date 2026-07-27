@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from db.connection import get_db
 from schemas import *
 from sqlalchemy.orm import Session
@@ -24,9 +26,9 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/", response_model=list[UserRead], )
-def get_all_users(user=Depends(check_token), db: Session = Depends(get_db)):
+def get_all_users(search_term: Optional[str] = Query(None), user=Depends(check_token), db: Session = Depends(get_db)):
     try:
-        users = get_all_users_db(db)
+        users = get_all_users_db(db, search_term)
         return users
     except Exception as e:
         raise e

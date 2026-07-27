@@ -15,3 +15,6 @@ class EmailSkill(Skill):
     def prompt(self):
         with open("skills/email/prompt.md") as f:
             return f.read()
+    def examples(self):
+        with open("skills/email/examples.md") as f:
+            return f.read()

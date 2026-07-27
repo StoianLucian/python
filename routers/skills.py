@@ -13,7 +13,7 @@ router = APIRouter(
 )
 
 @router.get("/")
-def get_skills(search_term: Optional[str] = Query(None),  user=Depends(check_token), db: Session = Depends(get_db)):
+def get_skills(search_term: Optional[str] = Query(None), user=Depends(check_token), db: Session = Depends(get_db)):
     return get_skills_db(db, search_term)
 
 
