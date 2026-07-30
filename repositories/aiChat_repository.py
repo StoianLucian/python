@@ -60,7 +60,7 @@ def get_embedding(text: str, model):
 
 
 
-def initialize_model_chat(model: str, messages: list[Message], stream: bool, options: Optional[dict] = None, tools: Optional[dict] = None):
+def initialize_model_chat(model: str, messages: list[Message], stream: bool, options: Optional[dict] = None, tools: Optional[dict] = None, format= None, thinking = False):
     
     parsed_messages = [
             m.model_dump() if hasattr(m, "model_dump") else m
@@ -75,12 +75,16 @@ def initialize_model_chat(model: str, messages: list[Message], stream: bool, opt
     
     if tools is not None:
         kwargs["tools"] = tools
-
+        
+    if format is not None:
+        kwargs["format"] = format
+        
+    if thinking is not None:
+        kwargs["think"] = thinking
     try:
         chat = client.chat(
            **kwargs
         )
-        
         return chat
     
     except Exception as e:

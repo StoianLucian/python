@@ -1,100 +1,136 @@
-# Skill: Send Email
+# `/send_email` Skill Examples
 
-## Purpose
-
-Use this skill whenever the user wants to send an email to one or more people.
-
-Examples:
-- "Email John that the meeting is postponed."
-- "Send Sarah the latest report."
-- "Tell Alex I'll be late."
+This document contains examples of the `/send_email` skill mention format and the corresponding behavior.
 
 ---
 
-## Workflow
+## Example 1 – Valid Request
 
-1. Identify the intended recipient(s).
-2. Resolve each recipient using the `search_users` tool.
-3. If no matching user is found:
-   - Ask the user who they meant.
-4. If multiple users match:
-   - Ask the user to choose the correct recipient.
-5. Once the recipient has been resolved:
-   - Use the returned `id` for all subsequent actions.
-   - Never guess or invent an email address.
-6. Generate a clear email subject if the user did not provide one.
-7. Generate a professional email body from the user's request.
-8. Call `send_email`.
+### Serialized Input
 
----
-
-## Tool Usage
-
-### search_users
-
-Input
-
-```json
-{
-  "query": "John"
-}
-```
-
-Example output
-
-```json
-{
-  "success": true,
-  "users": [
-    {
-      "id": 15,
-      "name": "John Smith",
-      "email": "john.smith@company.com"
+```js
+[
+  {
+    "type": "skill-mention",
+    "attrs": {
+      "id": 1,
+      "label": "/send_email"
     }
-  ]
-}
+  },
+  {
+    "type": "text",
+    "text": " to "
+  },
+  {
+    "type": "user-mention",
+    "attrs": {
+      "id": "15",
+      "label": "John"
+    }
+  },
+  {
+    "type": "text",
+    "text": " saying tomorrow's meeting has moved to 3 PM"
+  }
+]
 ```
 
----
+### Assistant reasoning
 
-### send_email
+- The `/send_email` skill was invoked.
+- A valid `user-mention` identifies the recipient.
+- Generate an appropriate subject and email content.
+- Call `send_email`.
 
-Input
+### Example output
 
 ```json
-{
-  "user_id": 15,
-  "subject": "Meeting postponed",
-  "body": "Hi John,\n\nThe meeting has been postponed until tomorrow.\n\nThanks."
-}
+send_email(
+  user_id="15",
+  subject="Tomorrow's Meeting Moved to 3 PM",
+  content="Hi John,\n\nJust letting you know that tomorrow's meeting has been moved to 3:00 PM.\n\nSee you then!"
+)
 ```
 
 ---
 
-## Rules
+## Example 2 – Missing User Mention
 
-- Never invent recipients.
-- Never invent email addresses.
-- Always resolve the recipient first.
-- Always use the returned user id.
-- Ask for clarification when multiple users match.
-- Ask for clarification when the recipient is missing.
+### Serialized Input
+
+```js
+[
+  {
+    "type": "skill-mention",
+    "attrs": {
+      "id": 1,
+      "label": "/send_email"
+    }
+  },
+  {
+    "type": "text",
+    "text": " to John saying I'll be about 15 minutes late"
+  }
+]
+```
+
+### Assistant reasoning
+
+- The `/send_email` skill was invoked.
+- No `user-mention` node is present.
+- The assistant cannot determine which contact "John" refers to.
+- Do **not** call `send_email`.
+- Ask the user to mention the intended recipient.
+
+### Example output
+
+> Please mention the recipient (e.g. @John) so I know which user to email.
 
 ---
 
-## Example
+## Example 3 – Valid Request
 
-User:
+### Serialized Input
 
-> Email John that tomorrow's meeting has moved to 3 PM.
+```js
+[
+  {
+    "type": "skill-mention",
+    "attrs": {
+      "id": 1,
+      "label": "/send_email"
+    }
+  },
+  {
+    "type": "text",
+    "text": " to "
+  },
+  {
+    "type": "user-mention",
+    "attrs": {
+      "id": "31",
+      "label": "Alex"
+    }
+  },
+  {
+    "type": "text",
+    "text": " thanking them for their help last week"
+  }
+]
+```
 
-Assistant reasoning:
+### Assistant reasoning
 
-1. search_users("John")
-2. send_email(
-       user_id=15,
-       subject="Meeting moved to 3 PM",
-       body="Hi John,..."
-   )
+- The recipient is identified by a `user-mention`.
+- Generate the email subject and content.
+- Call `send_email`.
 
-Return the normal success response.
+### Example output
+
+```json
+send_email(
+  user_id="31",
+  subject="Thank You",
+  content="Hi Alex,\n\nI just wanted to thank you for all your help last week. I really appreciate your support.\n\nThanks again!"
+)
+```

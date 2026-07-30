@@ -11,10 +11,10 @@ class DocumentSearchResposnse(BaseModel):
     source_id: int
     content: str
 
-def register_document_search_tools(mcp: FastMCP):
+def register_search_documents_tools(mcp: FastMCP):
 
     @mcp.tool
-    async def document_search(user_query: str) -> ToolResponse[list[DocumentSearchResposnse]]:
+    async def search_documents(user_query: str) -> ToolResponse[list[DocumentSearchResposnse]]:
         """
             Search the knowledge base for documents relevant to the user's question.
 
@@ -35,22 +35,3 @@ def register_document_search_tools(mcp: FastMCP):
 
         except Exception as e:
             return ToolResponse(success=False, result="Error: {e}}")
-        
-        
-        # db = SessionLocal()
-        # try:
-        #     # users = db.query(User).all()
-            
-        #     # db_users = []
-            
-        #     # for user in users:
-        #     #     db_users.append({
-        #     #         "username": user.username,
-        #     #         "email": user.email
-        #     #     })
-            
-        #     return ToolResponse(success=True, result=db_users)
-        # except Exception as e:
-        #     return ToolResponse(success= False, result=f"Error: {e}")
-        # finally:
-        #     db.close()

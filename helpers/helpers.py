@@ -32,7 +32,7 @@ def return_context_2(context: str):
         stmt = (
             select(Chunk.document_id, Chunk.content, Chunk.page_number)
             .order_by(Chunk.embedding.op("<=>")(embedding))
-            .limit(10)
+            .limit(5)
         )
         
         results = db.execute(stmt).all()

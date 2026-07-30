@@ -5,7 +5,7 @@ from db.connection import get_db
 from db.schemas.chunk import Chunk
 from helpers.helpers import return_context
 from repositories.aiChat_repository import initialize_model_chat, is_model_installed, return_available_models, return_smallest_model
-from prompts.prompts import rag_prompt, tool_calling_prompt
+from prompts.prompts import rag_prompt, tool_calling_prompt, test_prompt, test_prompt2
 from schemas import *
 from fastapi.responses import StreamingResponse
 import json
@@ -15,6 +15,8 @@ import os
 from skills import AVAILABLE_SKILLS
 
 from repositories import *
+from tools.cache.CMPToolsCache import MCPToolsCache
+from tools.helpers import find_skill
 
 router = APIRouter(
     prefix="/chat",
@@ -47,103 +49,200 @@ class ChatRequestTest(BaseModel):
 mcp = Client("http://localhost:8000/mcp")
 
 
+test_prompt = """You are a JSON-only assistant.
+
+Every response MUST be a valid JSON array.
+
+The array may contain one or more objects. Each object MUST match EXACTLY one of the following schemas.
+
+Text:
+{
+  "type": "text",
+  "text": "<string>"
+}
+
+Error:
+{
+  "type": "error",
+  "text": "<string>"
+}
+
+Rules:
+- The root MUST always be a JSON array, even if it contains only one object.
+- Output ONLY the JSON array.
+- Do NOT use Markdown or code fences.
+- Do NOT include any text before or after the JSON.
+- Every element in the array must be one of the two allowed object types.
+- Do NOT add extra fields.
+- Do NOT omit required fields.
+- Preserve the order of the content as it should be presented to the user.
+- Use one object for each distinct piece of content.
+- Use "text" for all normal responses.
+- Use "error" only when the request cannot be fulfilled.
+- The JSON must always be valid and parseable.
+
+Examples:
+
+[
+  {
+    "type": "text",
+    "text": "Hello!"
+  }
+]
+
+[
+  {
+    "type": "text",
+    "text": "Step 1: Open the application."
+  },
+  {
+    "type": "text",
+    "text": "Step 2: Select Settings."
+  },
+  {
+    "type": "text",
+    "text": "Step 3: Save your changes."
+  }
+]
+
+[
+  {
+    "type": "error",
+    "text": "I couldn't process your request."
+  }
+]
+"""
+
 @router.post("/")
 async def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
-    messages = body.messages
+    user_messages = body.messages
     model = body.model
+
+    last_message = user_messages[-1].content
     
-    print(AVAILABLE_SKILLS, "===============")
-
-    last_message = messages[-1].content
-
-    context = return_context(last_message, db)
+    mentioned_skill = find_skill(last_message)
     
     prompt = tool_calling_prompt.format(user_prompt=last_message)
 
+
     messages = [
-        {
-            "role": "system",
-            "content": prompt
-        },
-        *[
-            {
-                "role": m.role,
-                "content": m.content
-            }
-            for m in body.messages
-        ]
+        # {"role": "system", "content": test_prompt},
+        {"role": "user", "content": last_message}
     ]
     
-    async with mcp:
-        tools = await mcp.list_tools()
-
-        ollama_tools = [
-            {
-                "type": "function",
-                "function": {
-                    "name": tool.name,
-                    "description": tool.description or "",
-                    "parameters": tool.inputSchema,
-                },
-            }
-            for tool in tools
-        ]
-
-        while True:
-           
-            stream = initialize_model_chat(model, messages, False, tools=ollama_tools)
-
-            tools = stream.message.tool_calls
-
-            print("TOOL IN PROGRESS", tools)
-
-            # No more tool calls -> we're done
-            if not tools:
-                print("NO MORE TOOLS")
-                break
+    if mentioned_skill:
+        async with mcp:
+            tools = await MCPToolsCache.get_tools(mcp=mcp)
             
-            assistant_message = {
-                "role": "assistant",
-                "content": stream.message.content or "",
+            tool_instructions = {
+                "role": "system",
+                "content": f""" tool instructions:
+            {mentioned_skill.prompt()}
+            """
             }
-            if stream.message.tool_calls:
-                assistant_message["tool_calls"] = [
-                    tc.model_dump()
-                    for tc in stream.message.tool_calls
-                ]
+            messages.append(tool_instructions)
+            available_tools = [
+                tool
+                for tool in tools
+                if tool.name in mentioned_skill.tools
+            ]
 
-            messages.append(assistant_message)
-
-            # Execute each requested tool
-            for tool in tools:
-                tool_name = tool.function.name
-                tool_args = tool.function.arguments
-
-                result = await mcp.call_tool(tool_name, tool_args)
-
-                tool_response = result.structured_content
-
-                messages.append({
-                    "role": "tool",
-                    "name": tool_name,
-                    "content": json.dumps(tool_response),
-                })
+            ollama_tools = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": tool.name,
+                        "description": tool.description or "",
+                        "parameters": tool.inputSchema,
+                    },
+                }
+                for tool in available_tools
+            ]
+            MAX_TOOL_ITERATIONS = 25
+            seen_calls = set()
+            
+            for _ in range(MAX_TOOL_ITERATIONS):
+                stream = initialize_model_chat(model, messages, False, tools=ollama_tools)
+                tool_calls = stream.message.tool_calls
                 
-    print("MESSAGES after TOOLS" , messages[-1])
+                print(tool_calls, "tool calls ======")
+
+                if not tool_calls:
+                    print("NO MORE TOOLS")
+                    break
+                signature = tuple(
+                    (tc.function.name, json.dumps(tc.function.arguments, sort_keys=True))
+                    for tc in tool_calls
+                )
+                
+                if signature in seen_calls:
+                    raise RuntimeError("Tool loop detected.")
+                
+                seen_calls.add(signature)
+                assistant_message = {
+                    "role": "assistant",
+                    "content": stream.message.content or "",
+                }
+                if stream.message.tool_calls:
+                    assistant_message["tool_calls"] = [
+                        tc.model_dump()
+                        for tc in stream.message.tool_calls
+                    ]
+
+                messages.append(assistant_message)
+
+                for tool in tool_calls:
+                    tool_name = tool.function.name
+                    tool_args = tool.function.arguments
+
+                    result = await mcp.call_tool(tool_name, tool_args)
+
+                    tool_response = result.structured_content
+
+                    messages.append({
+                        "role": "tool",
+                        "name": tool_name,
+                        "content": json.dumps(tool_response),
+                    })
 
     def generate():
+        # smallest_model = return_smallest_model()
+        format = {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": ["text", "popover", "error"]
+                    },
+                    "text": {
+                        "type": "string"
+                    },
+                    "source_id": {
+                        "type": "number"
+                    },
+                    "page_number": {
+                        "type": "number"
+                    }
+                },
+                "required": ["type", "text"],
+                "additionalProperties": False
+            }
+        }
         
-        print("FIRST")
-        smallest_model = return_smallest_model()
-        
-        print("SMALLEST MODEL", smallest_model)
-        stream = initialize_model_chat("gemma4:e4b", messages, True)
+        if mentioned_skill:
+            messages.append({"role": "system", "content": f"return format examples : {mentioned_skill.examples()}"})
+            
+        stream = initialize_model_chat(model, messages, True, thinking=False)
 
         for chunk in stream:
 
             content = chunk.get("message", {}).get("content")
             thinking = chunk.get("message", {}).get("thinking")
             isDone = chunk.get("done")
+            
+            print(chunk, "chunk ================")
 
             if content or thinking:
                 yield json.dumps({

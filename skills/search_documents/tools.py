@@ -6,7 +6,7 @@ from import_folder.response import ToolResponse
 def register_email_tools(mcp: FastMCP):
 
     @mcp.tool
-    def send_email(user_id: str, subject: str, content: str) -> ToolResponse:
+    def send_email(user: str, subject: str, content: str) -> ToolResponse:
         """Send email to a specific user."""
         # db = SessionLocal()
         # print(user, "user_email_tool")
@@ -15,7 +15,6 @@ def register_email_tools(mcp: FastMCP):
             # if not user:
             #     return ToolResponse(success=False, result="User not found")
             # print(user, content, "email_tool")
-            print("email sent to", {user_id}, "==================")
-            return ToolResponse(success=True, result=f"Email sent successfully to {user_id} with subject: {subject} and content '{content}'")
+            return ToolResponse(success=True, result=f"Email sent successfully to {user} with subject {subject} content '{content}'")
         except Exception as e:
             return ToolResponse(success=False, result=str(e))
