@@ -1,7 +1,7 @@
 from datetime import datetime
 from db.schemas.user import User
 from errors.user import UserNotFoundError
-from services import check_match_password, hash_password, check_existing_user
+from services.security import check_match_password, hash_password, check_existing_user
 from sqlalchemy.orm import Session, load_only
 from sqlalchemy import or_
 from schemas import UserCreate
@@ -26,20 +26,20 @@ def create_user_db(userData: UserCreate, db: Session):
 
 
 def get_all_users_db(db: Session, search: str):
-    
+
     if search is not None and search != "":
         pattern = f"%{search}%"
         users = (db.query(User)
-                .options(load_only(User.id, User.username, User.email))
-                .filter(
-                    User.email.ilike(pattern) 
-                    | User.username.ilike(pattern)
-                ).all()
-            )
-    else :
-        users = db.query(User).options(load_only(User.id, User.username, User.email)).all()
+                 .options(load_only(User.id, User.username, User.email))
+                 .filter(
+            User.email.ilike(pattern)
+            | User.username.ilike(pattern)
+        ).all()
+        )
+    else:
+        users = db.query(User).options(
+            load_only(User.id, User.username, User.email)).all()
 
-    
     logging.info(f"user_repository.get_all_users_db")
     return users
 

@@ -1,215 +1,109 @@
-# `/send_email` Skill Examples
+# `/send_email` Response Examples
 
-This document contains examples of the `/send_email` skill mention format and the corresponding tool invocation.
+These examples describe the **final response** returned to the user *after* the
+`send_email` tool has run. They are NOT examples of tool arguments.
+
+## Output Format
+
+- Return an array of response objects.
+- Include exactly one `text` object confirming the outcome.
+- Never include the email subject or body in the response.
+- Never repeat or paraphrase the email content back to the user.
+- Never write the response as if you were the email itself.
+- Never return `popover` objects for this skill.
+- If the tool reported `success: false`, return a single `error` object.
 
 ---
 
-## Example 1
+## Example 1 – Email sent
 
-### Serialized Input
+Tool:
+```json
+{
+  "success": true,
+  "result": "Email sent successfully to user 15"
+}
+```
 
-```js
+Response:
+```json
 [
   {
-    "type": "skill-mention",
-    "attrs": {
-      "id": 1,
-      "label": "/send_email"
-    }
-  },
-  {
     "type": "text",
-    "text": " to "
-  },
-  {
-    "type": "user-mention",
-    "attrs": {
-      "id": 15,
-      "label": "John"
-    }
-  },
-  {
-    "type": "text",
-    "text": " saying tomorrow's meeting has moved to 3 PM"
+    "text": "Email sent successfully."
   }
 ]
 ```
 
-### User
-
-> Email John that tomorrow's meeting has moved to 3 PM.
-
-### Assistant reasoning
-
-- The user wants to send an email.
-- The recipient is John.
-- Generate an appropriate subject and body.
-
-### Example output
-
-```json
-send_email(
-  user_id=15,
-  subject="Tomorrow's Meeting Moved to 3 PM",
-  body="Hi John,\n\nJust letting you know that tomorrow's meeting has been moved to 3:00 PM.\n\nSee you then!"
-)
-```
-
 ---
 
-## Example 2
+## Example 2 – Email sent to a named recipient
 
-### Serialized Input
+Tool:
+```json
+{
+  "success": true,
+  "result": "Email sent successfully to user 23"
+}
+```
 
-```js
+Response:
+```json
 [
   {
-    "type": "skill-mention",
-    "attrs": {
-      "id": 1,
-      "label": "/send_email"
-    }
-  },
-  {
     "type": "text",
-    "text": " to "
-  },
-  {
-    "type": "user-mention",
-    "attrs": {
-      "id": 23,
-      "label": "Sarah"
-    }
-  },
-  {
-    "type": "text",
-    "text": " saying I will be about 15 minutes late"
+    "text": "Email sent to Sarah."
   }
 ]
 ```
 
-### User
-
-> Email Sarah that I'll be about 15 minutes late.
-
-### Assistant reasoning
-
-- The user wants to send an email.
-- The recipient is Sarah.
-- Generate a concise subject and body.
-
-### Example output
-
-```json
-send_email(
-  user_id=23,
-  subject="Running Late",
-  body="Hi Sarah,\n\nJust a quick note to let you know that I'll be about 15 minutes late.\n\nSee you soon!"
-)
-```
-
 ---
 
-## Example 3
+## Example 3 – Tool failed
 
-### Serialized Input
+Tool:
+```json
+{
+  "success": false,
+  "result": "User not found"
+}
+```
 
-```js
+Response:
+```json
 [
   {
-    "type": "skill-mention",
-    "attrs": {
-      "id": 1,
-      "label": "/send_email"
-    }
-  },
-  {
-    "type": "text",
-    "text": " to "
-  },
-  {
-    "type": "user-mention",
-    "attrs": {
-      "id": 31,
-      "label": "Alex"
-    }
-  },
-  {
-    "type": "text",
-    "text": " thanking them for their help last week"
+    "type": "error",
+    "text": "The email could not be sent: user not found."
   }
 ]
 ```
 
-### User
-
-> Email Alex thanking them for their help last week.
-
-### Assistant reasoning
-
-- The user wants to send an email.
-- The recipient is Alex.
-- Compose a polite thank-you email.
-
-### Example output
-
-```json
-send_email(
-  user_id=31,
-  subject="Thank You",
-  body="Hi Alex,\n\nI just wanted to thank you for all your help last week. I really appreciate your support.\n\nThanks again!"
-)
-```
-
 ---
 
-## Example 4
+## Example 4 – Recipient missing, no tool call was made
 
-### Serialized Input
-
-```js
+Response:
+```json
 [
   {
-    "type": "skill-mention",
-    "attrs": {
-      "id": 1,
-      "label": "/send_email"
-    }
-  },
-  {
     "type": "text",
-    "text": " to "
-  },
-  {
-    "type": "user-mention",
-    "attrs": {
-      "id": 42,
-      "label": "Emily"
-    }
-  },
-  {
-    "type": "text",
-    "text": " asking if she is available for lunch on Friday"
+    "text": "Please mention the recipient (e.g. @John) so I know who to email."
   }
 ]
 ```
 
-### User
+---
 
-> Email Emily asking if she's available for lunch on Friday.
+## Incorrect
 
-### Assistant reasoning
-
-- The user wants to send an email.
-- The recipient is Emily.
-- Generate an appropriate subject and email body.
-
-### Example output
+Never return the email itself:
 
 ```json
-send_email(
-  user_id=42,
-  subject="Lunch on Friday?",
-  body="Hi Emily,\n\nI was wondering if you're available for lunch this Friday. Let me know if that works for you!\n\nLooking forward to hearing from you."
-)
+[
+  {
+    "type": "text",
+    "text": "Hi Sarah, just letting you know I'll be about 15 minutes late."
+  }
+]
 ```

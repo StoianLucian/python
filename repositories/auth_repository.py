@@ -2,8 +2,7 @@ from fastapi import HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 from db.schemas.user import User
 from dto.auth.auth import LoginRequest
-from services import create_jwt, verify_jwt, verify_password
-from services.security import return_user_object
+from services.security import create_jwt, return_user_object, verify_jwt, verify_password
 import os
 import logging
 

@@ -3,7 +3,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
-from import_folder.mcp_server import mcp_app 
+from import_folder.mcp_server import mcp_app
 
 
 from errors.user import AppError
@@ -14,7 +14,6 @@ from routers import (
     files,
     users,
     chat_session,
-    bot_chat,
     skills
 )
 from repositories.slack_bot import handler
@@ -32,6 +31,7 @@ load_dotenv()
 # FastAPI
 # ------------------------------------------------------------------
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with mcp_app.lifespan(app):
@@ -43,11 +43,6 @@ app = FastAPI(lifespan=lifespan)
 # ------------------------------------------------------------------
 # Middleware
 # ------------------------------------------------------------------
-
-
-# mcp = FastMCP("Assistant")
-# print(dir(mcp))
-
 
 
 app.add_middleware(
@@ -69,6 +64,7 @@ app.add_middleware(
 # Exception handlers
 # ------------------------------------------------------------------
 
+
 @app.exception_handler(AppError)
 async def app_error_handler(request: Request, exc: AppError):
     return JSONResponse(
@@ -83,6 +79,7 @@ async def app_error_handler(request: Request, exc: AppError):
 # Routes
 # ------------------------------------------------------------------
 
+
 @app.post("/slack/events")
 async def slack_events(request: Request):
     return await handler.handle(request)
@@ -93,6 +90,5 @@ app.include_router(files.router)
 app.include_router(ai_chat.router)
 app.include_router(chat_session.router)
 app.include_router(chat_message.router)
-app.include_router(bot_chat.router)
 app.include_router(skills.router)
 app.mount("/mcp", mcp_app)

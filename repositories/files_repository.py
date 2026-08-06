@@ -26,14 +26,16 @@ def upload_file_db(filename: string, storageKey: string, size: int, type: string
 
     return file
 
+
 def reset_files_db(db: Session, user_id: int):
     try:
-        db.query(File).filter(File.created_by == user_id).delete(synchronize_session=False)
-        db.query(Chunk).filter(Chunk.created_by == user_id).delete(synchronize_session=False)
+        db.query(File).filter(File.created_by == user_id).delete(
+            synchronize_session=False)
+        db.query(Chunk).filter(Chunk.created_by ==
+                               user_id).delete(synchronize_session=False)
         db.commit()
-        
+
         return True
     except Exception:
         db.rollback()
         raise
-    

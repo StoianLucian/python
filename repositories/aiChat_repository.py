@@ -32,7 +32,7 @@ def is_model_installed(model_name: str) -> bool:
     except ResponseError as e:
         print(e)
         return False
-    
+
 
 def initialize_model_generate(model: str, prompt: str, stream: bool = False, options: Optional[dict] = None):
     response = client.generate(
@@ -59,34 +59,33 @@ def get_embedding(text: str, model):
     return response["embedding"]
 
 
+def initialize_model_chat(model: str, messages: list[Message], stream: bool, options: Optional[dict] = None, tools: Optional[dict] = None, format=None, thinking=False):
 
-def initialize_model_chat(model: str, messages: list[Message], stream: bool, options: Optional[dict] = None, tools: Optional[dict] = None, format= None, thinking = False):
-    
     parsed_messages = [
-            m.model_dump() if hasattr(m, "model_dump") else m
-            for m in messages
-        ]
+        m.model_dump() if hasattr(m, "model_dump") else m
+        for m in messages
+    ]
     kwargs = {
-        "model":model,
+        "model": model,
         "messages": parsed_messages,
         "stream": stream,
         "options": options,
     }
-    
+
     if tools is not None:
         kwargs["tools"] = tools
-        
+
     if format is not None:
         kwargs["format"] = format
-        
+
     if thinking is not None:
         kwargs["think"] = thinking
     try:
         chat = client.chat(
-           **kwargs
+            **kwargs
         )
         return chat
-    
+
     except Exception as e:
         raise e
 
@@ -123,6 +122,7 @@ def return_available_embedding_models():
     ]
 
     return model_names
+
 
 def return_smallest_model():
     try:

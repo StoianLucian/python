@@ -1,6 +1,9 @@
-# `/send_email` Skill Examples
+# `/send_email` Tool Usage
 
-This document contains examples of the `/send_email` skill mention format and the corresponding behavior.
+This document describes how to decide the arguments for the `send_email` tool.
+The `content` argument is the email body — it is sent to the recipient and must
+never appear in your reply to the user. After the tool returns, only confirm the
+outcome.
 
 ---
 

@@ -3,16 +3,13 @@ from typing import Optional
 from fastapi import APIRouter, Depends
 from db.connection import get_db
 from db.schemas.chunk import Chunk
-from helpers.helpers import return_context
+from lmm.factory import get_lmm_provider
 from repositories.aiChat_repository import initialize_model_chat, is_model_installed, return_available_models, return_smallest_model
-from prompts.prompts import rag_prompt, tool_calling_prompt, test_prompt, test_prompt2
+from prompts.prompts import rag_prompt, tool_calling_prompt, tool_phase_prompt, test_prompt, test_prompt2
 from schemas import *
 from fastapi.responses import StreamingResponse
 import json
 from fastmcp import Client
-from ollama import Client as OllamaClient
-import os
-from skills import AVAILABLE_SKILLS
 
 from repositories import *
 from tools.cache.CMPToolsCache import MCPToolsCache
@@ -29,13 +26,6 @@ class ChatRequest(BaseModel):
     model: str
 
 
-modelUrl = os.getenv("MODEL_URL")
-
-client = OllamaClient(
-    host=modelUrl
-)
-
-
 class Message(BaseModel):
     role: str
     content: str
@@ -45,7 +35,8 @@ class Message(BaseModel):
 class ChatRequestTest(BaseModel):
     messages: list[Message]
     model: str
-    
+
+
 mcp = Client("http://localhost:8000/mcp")
 
 
@@ -113,34 +104,38 @@ Examples:
 ]
 """
 
+
 @router.post("/")
 async def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
+    provider = get_lmm_provider()
     user_messages = body.messages
     model = body.model
 
     last_message = user_messages[-1].content
-    
+
     mentioned_skill = find_skill(last_message)
-    
+
     prompt = tool_calling_prompt.format(user_prompt=last_message)
 
+    # The tool phase and the answer phase need different system prompts. Asking for
+    # a JSON-only reply while tools are still on the table makes the model emit a
+    # fabricated "text" object instead of calling the tool, so the tool phase runs
+    # on its own message list and only the resulting tool history is carried over.
+    tool_history = []
 
-    messages = [
-        # {"role": "system", "content": test_prompt},
-        {"role": "user", "content": last_message}
-    ]
-    
     if mentioned_skill:
         async with mcp:
             tools = await MCPToolsCache.get_tools(mcp=mcp)
-            
-            tool_instructions = {
-                "role": "system",
-                "content": f""" tool instructions:
-            {mentioned_skill.prompt()}
-            """
-            }
-            messages.append(tool_instructions)
+
+            messages = [
+                {"role": "system", "content": tool_phase_prompt},
+                {
+                    "role": "system",
+                    "content": f"tool instructions:\n{mentioned_skill.prompt()}",
+                },
+                {"role": "user", "content": last_message},
+            ]
+
             available_tools = [
                 tool
                 for tool in tools
@@ -160,24 +155,26 @@ async def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
             ]
             MAX_TOOL_ITERATIONS = 25
             seen_calls = set()
-            
+
             for _ in range(MAX_TOOL_ITERATIONS):
-                stream = initialize_model_chat(model, messages, False, tools=ollama_tools)
+                stream = provider.chat(
+                    model, messages, False, tools=ollama_tools)
                 tool_calls = stream.message.tool_calls
-                
+
                 print(tool_calls, "tool calls ======")
 
                 if not tool_calls:
                     print("NO MORE TOOLS")
                     break
                 signature = tuple(
-                    (tc.function.name, json.dumps(tc.function.arguments, sort_keys=True))
+                    (tc.function.name, json.dumps(
+                        tc.function.arguments, sort_keys=True))
                     for tc in tool_calls
                 )
-                
+
                 if signature in seen_calls:
                     raise RuntimeError("Tool loop detected.")
-                
+
                 seen_calls.add(signature)
                 assistant_message = {
                     "role": "assistant",
@@ -190,6 +187,7 @@ async def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
                     ]
 
                 messages.append(assistant_message)
+                tool_history.append(assistant_message)
 
                 for tool in tool_calls:
                     tool_name = tool.function.name
@@ -199,11 +197,16 @@ async def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
 
                     tool_response = result.structured_content
 
-                    messages.append({
+                    print(tool_response, "tool response ========")
+
+                    tool_message = {
                         "role": "tool",
                         "name": tool_name,
                         "content": json.dumps(tool_response),
-                    })
+                    }
+
+                    messages.append(tool_message)
+                    tool_history.append(tool_message)
 
     def generate():
         # smallest_model = return_smallest_model()
@@ -230,19 +233,30 @@ async def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
                 "additionalProperties": False
             }
         }
-        
-        if mentioned_skill:
-            messages.append({"role": "system", "content": f"return format examples : {mentioned_skill.examples()}"})
-            
-        stream = initialize_model_chat(model, messages, True, thinking=False)
 
+        answer_messages = [
+            {"role": "system", "content": test_prompt},
+            {"role": "user", "content": prompt},
+        ]
+
+        if mentioned_skill:
+            answer_messages.extend(tool_history)
+            answer_messages.append({
+                "role": "system",
+                "content": (
+                    "All tool calls are complete. Do not call any more tools.\n"
+                    "Report the outcome of the tool results to the user as a JSON array.\n"
+                    "Never restate the arguments you passed to a tool.\n\n"
+                    f"Response format examples:\n{mentioned_skill.examples()}"
+                ),
+            })
+
+        stream = provider.chat(model, answer_messages, True, thinking=False)
         for chunk in stream:
 
             content = chunk.get("message", {}).get("content")
             thinking = chunk.get("message", {}).get("thinking")
             isDone = chunk.get("done")
-            
-            print(chunk, "chunk ================")
 
             if content or thinking:
                 yield json.dumps({
@@ -267,7 +281,7 @@ class ChatRequest(BaseModel):
 @router.post("/ping")
 def chat(body: ChatRequest):
     model = body.model
-  
+
     try:
         return is_model_installed(model)
     except Exception as e:
