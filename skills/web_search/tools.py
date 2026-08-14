@@ -11,7 +11,7 @@ class DocumentSearchResposnse(BaseModel):
     source_id: int
     content: str
 
-def register_search_documents_tools(mcp: FastMCP):
+def register_web_search_tools(mcp: FastMCP):
 
     @mcp.tool
     async def search_documents(user_query: str) -> ToolResponse[list[DocumentSearchResposnse]]:

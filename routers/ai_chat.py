@@ -44,7 +44,8 @@ test_prompt = """You are a JSON-only assistant.
 
 Every response MUST be a valid JSON array.
 
-The array may contain one or more objects. Each object MUST match EXACTLY one of the following schemas.
+The array may contain one or more objects. These base object types are always
+available:
 
 Text:
 {
@@ -58,17 +59,20 @@ Error:
   "text": "<string>"
 }
 
+Additional object types may be defined by the skill instructions later in this
+conversation. When skill instructions define an object type, that type is
+allowed and you MUST use it exactly as shown in its examples.
+
 Rules:
 - The root MUST always be a JSON array, even if it contains only one object.
 - Output ONLY the JSON array.
 - Do NOT use Markdown or code fences.
 - Do NOT include any text before or after the JSON.
-- Every element in the array must be one of the two allowed object types.
-- Do NOT add extra fields.
+- Never render lists, numbering, or structured data inside a "text" string when
+  a more specific object type exists for that data. Emit one object per item.
 - Do NOT omit required fields.
 - Preserve the order of the content as it should be presented to the user.
 - Use one object for each distinct piece of content.
-- Use "text" for all normal responses.
 - Use "error" only when the request cannot be fulfilled.
 - The JSON must always be valid and parseable.
 
@@ -117,10 +121,6 @@ async def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
 
     prompt = tool_calling_prompt.format(user_prompt=last_message)
 
-    # The tool phase and the answer phase need different system prompts. Asking for
-    # a JSON-only reply while tools are still on the table makes the model emit a
-    # fabricated "text" object instead of calling the tool, so the tool phase runs
-    # on its own message list and only the resulting tool history is carried over.
     tool_history = []
 
     if mentioned_skill:
@@ -209,47 +209,36 @@ async def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
                     tool_history.append(tool_message)
 
     def generate():
-        # smallest_model = return_smallest_model()
-        format = {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "type": {
-                        "type": "string",
-                        "enum": ["text", "popover", "error"]
-                    },
-                    "text": {
-                        "type": "string"
-                    },
-                    "source_id": {
-                        "type": "number"
-                    },
-                    "page_number": {
-                        "type": "number"
-                    }
-                },
-                "required": ["type", "text"],
-                "additionalProperties": False
-            }
-        }
 
-        answer_messages = [
-            {"role": "system", "content": test_prompt},
-            {"role": "user", "content": prompt},
-        ]
+        answer_messages = [{"role": "system", "content": test_prompt}]
 
         if mentioned_skill:
+            answer_messages.append({
+                "role": "system",
+                "content": (
+                    f"Skill output contract for '{mentioned_skill.name}'.\n"
+                    "These instructions take precedence over the generic response\n"
+                    "format above. Any object type used in the examples below is\n"
+                    "allowed, including its extra fields, and must be reproduced\n"
+                    "exactly as shown.\n\n"
+                    f"{mentioned_skill.examples()}"
+                ),
+            })
+            answer_messages.append({"role": "user", "content": last_message})
             answer_messages.extend(tool_history)
             answer_messages.append({
                 "role": "system",
                 "content": (
                     "All tool calls are complete. Do not call any more tools.\n"
-                    "Report the outcome of the tool results to the user as a JSON array.\n"
-                    "Never restate the arguments you passed to a tool.\n\n"
-                    f"Response format examples:\n{mentioned_skill.examples()}"
+                    "Report the outcome of the tool results to the user as a JSON array,\n"
+                    f"following the '{mentioned_skill.name}' output contract exactly.\n"
+                    "Emit one object per item from the tool results — never collapse them\n"
+                    "into a single text object.\n"
+                    "Never restate the arguments you passed to a tool."
                 ),
             })
+        else:
+            answer_messages.append({"role": "user", "content": prompt})
 
         stream = provider.chat(model, answer_messages, True, thinking=False)
         for chunk in stream:

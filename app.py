@@ -12,6 +12,7 @@ from routers import (
     auth,
     chat_message,
     files,
+    github,
     users,
     chat_session,
     skills
@@ -91,4 +92,5 @@ app.include_router(ai_chat.router)
 app.include_router(chat_session.router)
 app.include_router(chat_message.router)
 app.include_router(skills.router)
+app.include_router(github.router)
 app.mount("/mcp", mcp_app)

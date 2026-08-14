@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from db.schemas.chunk import Chunk
 from repositories.aiChat_repository import get_embedding, return_available_embedding_models
+from tavily import TavilyClient
+import os
 
 
 def raise_error(status: int, message: str, code: Enum):
@@ -23,41 +25,34 @@ def raise_error(status: int, message: str, code: Enum):
 
 def return_context_2(context: str):
     db = SessionLocal()
-    
+
     try:
-        
+
         embedding_models = return_available_embedding_models()
-        embedding = get_embedding(text=context,model=embedding_models[0]["name"])
-            
+        embedding = get_embedding(
+            text=context, model=embedding_models[0]["name"])
+
         stmt = (
             select(Chunk.document_id, Chunk.content, Chunk.page_number)
             .order_by(Chunk.embedding.op("<=>")(embedding))
             .limit(5)
         )
-        
+
         results = db.execute(stmt).all()
-        
+
         data = []
 
         for source_id, content, page_number in results:
-            data.append({"source_id": source_id, "content": content,"page_number": page_number})
-            
+            data.append({"source_id": source_id,
+                        "content": content, "page_number": page_number})
+
         return data
     except Exception as e:
         return e
-        
+
     finally:
         db.close()
-   
-   
 
-
-
-   
-
-   
-
-  
 
 def return_context(context: str, db: Session):
     embedding_models = return_available_embedding_models()
@@ -73,7 +68,6 @@ def return_context(context: str, db: Session):
     )
 
     results = db.execute(stmt).all()
-
 
     data = []
 
@@ -93,3 +87,15 @@ def sanitize_input(text):
     page_text = text.replace("\n", " ")
     page_text = re.sub(r"\s+", " ", page_text).strip()
     return page_text
+
+
+def search_on_web(question: str):
+
+    TAVILY_SEARCH_KEY = os.getenv("TAVILY_SEARCH_KEY")
+    client = TavilyClient(TAVILY_SEARCH_KEY)
+    response = client.search(
+        query=question,
+        search_depth="advanced"
+    )
+
+    return response

@@ -1,5 +1,6 @@
 from skills.base import Skill
-from tools.serach_documents import register_search_documents_tools
+from skills.web_search.tools import register_search_documents_tools
+
 
 # from skills.email.
 
