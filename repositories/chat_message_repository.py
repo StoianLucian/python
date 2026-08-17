@@ -1,8 +1,8 @@
 
 from datetime import datetime
-from db.schemas.ChatMessage import ChatMessage
-from db.schemas.ChatSession import ChatSession
-from db.schemas.Image import Image
+from db.schemas.chat_message import ChatMessage
+from db.schemas.chat_session import ChatSession
+from db.schemas.image import Image
 from sqlalchemy.orm import Session
 from dto.message.message import CreateMessage
 from repositories.chat_session_repository import check_session_exists

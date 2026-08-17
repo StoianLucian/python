@@ -1,7 +1,7 @@
 
 import logging
 
-from repositories.aiChat_repository import initialize_model_generate, return_available_models
+from repositories.ai_chat_repository import initialize_model_generate, return_available_models
 from prompts.prompts import slack_bot_prompt
 from slack_sdk.errors import SlackApiError
 

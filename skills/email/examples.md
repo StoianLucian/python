@@ -10,7 +10,6 @@ These examples describe the **final response** returned to the user *after* the
 - Never include the email subject or body in the response.
 - Never repeat or paraphrase the email content back to the user.
 - Never write the response as if you were the email itself.
-- Never return `popover` objects for this skill.
 - If the tool reported `success: false`, return a single `error` object.
 
 ---

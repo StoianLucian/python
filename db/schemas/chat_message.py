@@ -4,7 +4,7 @@ from typing import List
 from sqlalchemy import Date, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from db.schemas.Base import Base
+from db.schemas.base import Base
 
 
 class ChatMessage(Base):

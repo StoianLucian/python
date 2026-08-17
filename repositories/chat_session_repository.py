@@ -1,9 +1,9 @@
 from datetime import datetime
 from db.schemas import ChatMessage
-from db.schemas.ChatSession import ChatSession
+from db.schemas.chat_session import ChatSession
 from sqlalchemy.orm import Session, selectinload
 from errors.user import SessionNotFound
-from repositories.aiChat_repository import initialize_model_generate, return_smallest_model, session_summary_options
+from repositories.ai_chat_repository import initialize_model_generate, return_smallest_model, session_summary_options
 from prompts.prompts import session_summary_prompt
 
 

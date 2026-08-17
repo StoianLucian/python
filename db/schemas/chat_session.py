@@ -4,7 +4,7 @@ from datetime import datetime
 from sqlalchemy import Date, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from db.schemas.Base import Base
+from db.schemas.base import Base
 
 class ChatSession(Base):
     __tablename__ = "chat_sessions"

@@ -3,7 +3,7 @@
 from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from db.schemas.Base import Base
+from db.schemas.base import Base
 
 
 class Image(Base):

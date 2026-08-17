@@ -2,7 +2,7 @@
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from db.schemas.Base import Base
+from db.schemas.base import Base
 
 from config.db_config import DB_CONFIG
 from dotenv import load_dotenv

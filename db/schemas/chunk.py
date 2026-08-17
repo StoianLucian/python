@@ -5,7 +5,7 @@ from pgvector.sqlalchemy import Vector
 from sqlalchemy import Date, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from db.schemas.Base import Base
+from db.schemas.base import Base
 
 
 class Chunk(Base):

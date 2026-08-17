@@ -44,7 +44,7 @@ def get_user_by_id(id, db: Session = Depends(get_db), user=Depends(check_token))
 
 
 @router.delete("/{id}")
-def delete_user_by_id(id: int, db: Session = Depends(get_db)):
+def delete_user_by_id(id: int, db: Session = Depends(get_db), user = Depends(check_token)):
     try:
         success = delete_user_by_id_db(id, db)
         if not success:

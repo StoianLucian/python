@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import Date, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from db.schemas.Base import Base
+from db.schemas.base import Base
 
 
 class Skill(Base):

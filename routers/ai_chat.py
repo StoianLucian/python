@@ -4,15 +4,16 @@ from fastapi import APIRouter, Depends
 from db.connection import get_db
 from db.schemas.chunk import Chunk
 from lmm.factory import get_lmm_provider
-from repositories.aiChat_repository import initialize_model_chat, is_model_installed, return_available_models, return_smallest_model
-from prompts.prompts import rag_prompt, tool_calling_prompt, tool_phase_prompt, test_prompt, test_prompt2
+from lmm.usage import TokenUsage
+from repositories.ai_chat_repository import is_model_installed, return_available_models
+from prompts.prompts import tool_calling_prompt, tool_phase_prompt, test_prompt
 from schemas import *
 from fastapi.responses import StreamingResponse
 import json
 from fastmcp import Client
 
 from repositories import *
-from tools.cache.CMPToolsCache import MCPToolsCache
+from tools.cache.mcp_tools_cache import MCPToolsCache
 from tools.helpers import find_skill
 
 router = APIRouter(
@@ -110,7 +111,7 @@ Examples:
 
 
 @router.post("/")
-async def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
+async def chat(body: ChatRequestTest,  user: Session = Depends(check_token)):
     provider = get_lmm_provider()
     user_messages = body.messages
     model = body.model
@@ -122,6 +123,9 @@ async def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
     prompt = tool_calling_prompt.format(user_prompt=last_message)
 
     tool_history = []
+
+    # The running "bill" for this request. Every model call adds to it.
+    usage = TokenUsage()
 
     if mentioned_skill:
         async with mcp:
@@ -159,6 +163,12 @@ async def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
             for _ in range(MAX_TOOL_ITERATIONS):
                 stream = provider.chat(
                     model, messages, False, tools=ollama_tools)
+
+                # Bill this call. Note the input token count climbs every
+                # iteration because `messages` keeps growing.
+                usage.add_ollama(stream)
+                print(f"tool loop usage so far: {usage.to_dict()}")
+
                 tool_calls = stream.message.tool_calls
 
                 print(tool_calls, "tool calls ======")
@@ -255,6 +265,11 @@ async def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
                 }) + "\n"
 
             if chunk.get("done"):
+                # Ollama puts the token counts on the final (done) chunk.
+                usage.add_ollama(chunk)
+                print(f"final request usage: {usage.to_dict()}")
+                # Emit the bill as a last event so the client can display it.
+                yield json.dumps({"usage": usage.to_dict(), "done": True}) + "\n"
                 break
 
     return StreamingResponse(
@@ -263,12 +278,12 @@ async def chat(body: ChatRequestTest,  db: Session = Depends(get_db)):
     )
 
 
-class ChatRequest(BaseModel):
+class PingRequest(BaseModel):
     model: str
 
 
 @router.post("/ping")
-def chat(body: ChatRequest):
+def chat(body: PingRequest):
     model = body.model
 
     try:

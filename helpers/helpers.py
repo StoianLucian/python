@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from db.schemas.chunk import Chunk
-from repositories.aiChat_repository import get_embedding, return_available_embedding_models
+from repositories.ai_chat_repository import get_embedding, return_available_embedding_models
 from tavily import TavilyClient
 import os
 

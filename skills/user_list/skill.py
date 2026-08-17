@@ -1,5 +1,5 @@
 from skills.base import Skill
-from tools.users import register_users_tools
+from skills.user_list.tools import register_users_tools
 
 
 class UserListSkill(Skill):
