@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 
 from db.schemas.chunk import Chunk
 from repositories.ai_chat_repository import get_embedding, return_available_embedding_models
-from tavily import TavilyClient
 import os
 
 
@@ -87,15 +86,3 @@ def sanitize_input(text):
     page_text = text.replace("\n", " ")
     page_text = re.sub(r"\s+", " ", page_text).strip()
     return page_text
-
-
-def search_on_web(question: str):
-
-    TAVILY_SEARCH_KEY = os.getenv("TAVILY_SEARCH_KEY")
-    client = TavilyClient(TAVILY_SEARCH_KEY)
-    response = client.search(
-        query=question,
-        search_depth="advanced"
-    )
-
-    return response

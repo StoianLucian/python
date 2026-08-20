@@ -1,36 +1,43 @@
-# Skill: Search Documents
+# Skill: Web Search
 
 ## Purpose
 
-Use this skill whenever the user asks a question that may be answered using the company's knowledge base or stored documents.
+Use this skill whenever the user asks a question that requires current, real-time,
+or external information that is not in the company's own documents.
 
 Examples include:
 
-- Company policies
-- Employee handbook
-- Technical documentation
-- Internal procedures
-- Product documentation
-- FAQs
-- Previously indexed documents
+- Recent news or current events
+- Latest versions, releases, or prices
+- Facts that change over time (weather, stock prices, standings)
+- Information about external companies, products, or people
+- Anything the user explicitly asks you to "look up" or "search online"
+- Questions where your own knowledge may be outdated
+
+Do **not** use this skill for questions answerable from internal documentation —
+use `search_documents` for those.
 
 ---
 
 ## Workflow
 
-1. Determine whether the user's question requires information from company documentation.
-2. Call `search_documents` using the user's question as the search query.
-3. Read the returned document excerpts.
-4. Answer the user's question using only the retrieved information.
-5. If multiple excerpts are returned, combine them into a clear and concise answer.
-6. If no relevant documents are found, tell the user.
+1. Determine whether the question needs fresh or external information from the web.
+2. Rewrite the user's request into a concise, keyword-focused search query
+   (drop conversational filler; keep the essential terms).
+3. Call `web_search` with that query as `use_question`.
+4. Read the returned results (title, url, content snippet).
+5. Synthesize a clear, direct answer from the most relevant and recent results.
+6. Cite the sources you actually used.
+7. If no useful results are returned, tell the user you couldn't find anything.
 
 ---
 
 ## Rules
 
-- Search before answering when documentation is required.
-- Do not invent information that was not retrieved.
-- If the retrieved information is incomplete, say so.
-- Summarize the retrieved content instead of copying large passages.
-- If appropriate, reference the page number(s) where the information was found.
+- Search before answering when the question needs current or external information.
+- Base the answer only on the retrieved results — do not invent facts or URLs.
+- Prefer recent, authoritative sources; note the date when recency matters.
+- If results conflict, say so and present the most credible view.
+- Summarize; do not paste large passages verbatim.
+- Always cite the URLs of the sources used in the answer.
+- If the results are incomplete or ambiguous, say so rather than guessing.

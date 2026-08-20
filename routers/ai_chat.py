@@ -14,7 +14,7 @@ from fastmcp import Client
 
 from repositories import *
 from tools.cache.mcp_tools_cache import MCPToolsCache
-from tools.helpers import find_skill
+from tools.helpers import find_skill, strip_trigger
 
 router = APIRouter(
     prefix="/chat",
@@ -120,6 +120,14 @@ async def chat(body: ChatRequestTest,  user: Session = Depends(check_token)):
 
     mentioned_skill = find_skill(last_message)
 
+    clean_message = (
+        strip_trigger(last_message, mentioned_skill)
+        if mentioned_skill
+        else last_message
+    )
+
+    print(mentioned_skill, "mentioned ========")
+
     prompt = tool_calling_prompt.format(user_prompt=last_message)
 
     tool_history = []
@@ -137,7 +145,7 @@ async def chat(body: ChatRequestTest,  user: Session = Depends(check_token)):
                     "role": "system",
                     "content": f"tool instructions:\n{mentioned_skill.prompt()}",
                 },
-                {"role": "user", "content": last_message},
+                {"role": "user", "content": clean_message},
             ]
 
             available_tools = [
@@ -234,7 +242,7 @@ async def chat(body: ChatRequestTest,  user: Session = Depends(check_token)):
                     f"{mentioned_skill.examples()}"
                 ),
             })
-            answer_messages.append({"role": "user", "content": last_message})
+            answer_messages.append({"role": "user", "content": clean_message})
             answer_messages.extend(tool_history)
             answer_messages.append({
                 "role": "system",

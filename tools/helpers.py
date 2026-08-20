@@ -13,3 +13,11 @@ def find_skill(query: str):
             return skill
 
     return None
+
+
+def strip_trigger(query: str, skill) -> str:
+    """Remove any of the skill's trigger tokens from the message and trim."""
+    cleaned = query
+    for t in skill.trigger:
+        cleaned = cleaned.replace(t, "")
+    return cleaned.strip()

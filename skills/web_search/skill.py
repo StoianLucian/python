@@ -2,7 +2,7 @@ from skills.base import Skill
 from skills.web_search.tools import register_web_search_tools
 
 
-class WebSearch(Skill):
+class WebSearchSkill(Skill):
     name = "web_search"
     description = "Search for information on the internet."
     keywords = [
