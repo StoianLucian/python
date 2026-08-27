@@ -13,6 +13,7 @@ class OllamaProvider(LMMProvider):
         tools=None,
         options=None,
         thinking=False,
+        format=None
     ):
         kwargs = {
             "model": model,
@@ -20,6 +21,7 @@ class OllamaProvider(LMMProvider):
             "stream": stream,
             "options": options,
             "think": thinking,
+            "format": format
         }
 
         if tools:

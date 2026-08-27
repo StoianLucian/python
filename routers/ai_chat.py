@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends
@@ -9,6 +10,7 @@ from repositories.ai_chat_repository import is_model_installed, return_available
 from prompts.prompts import tool_calling_prompt, tool_phase_prompt, test_prompt
 from schemas import *
 from fastapi.responses import StreamingResponse
+import copy
 import json
 from fastmcp import Client
 
@@ -39,6 +41,33 @@ class ChatRequestTest(BaseModel):
 
 
 mcp = Client("http://localhost:8000/mcp")
+
+
+# Tools whose `created_by` must be filled from the authenticated user, never
+# from the LLM. The argument is stripped from the tool schema shown to the model
+# (see `sanitize_tool_schema`) and injected server-side before the call.
+USER_SCOPED_TOOLS = {"add_food_entry", "get_daily_totals_tool"}
+
+# Sampling options for every model call. Qwen3 explicitly warns against greedy
+# decoding (temperature 0) — it can cause repetition loops that would trip the
+# "Tool loop detected" guard — so we use its recommended non-thinking settings.
+SAMPLING_OPTIONS = {"temperature": 0.7, "top_p": 0.8, "top_k": 20}
+
+
+def sanitize_tool_schema(schema: dict) -> dict:
+    """Return a copy of an MCP tool's input schema with the server-injected
+    `created_by` argument removed, so the model neither sees nor fills it."""
+    schema = copy.deepcopy(schema or {})
+
+    properties = schema.get("properties")
+    if isinstance(properties, dict):
+        properties.pop("created_by", None)
+
+    required = schema.get("required")
+    if isinstance(required, list):
+        schema["required"] = [r for r in required if r != "created_by"]
+
+    return schema
 
 
 test_prompt = """You are a JSON-only assistant.
@@ -138,6 +167,8 @@ async def chat(body: ChatRequestTest,  user: Session = Depends(check_token)):
     if mentioned_skill:
         async with mcp:
             tools = await MCPToolsCache.get_tools(mcp=mcp)
+            
+            print(mentioned_skill, "========== mentiond")
 
             messages = [
                 {"role": "system", "content": tool_phase_prompt},
@@ -160,7 +191,7 @@ async def chat(body: ChatRequestTest,  user: Session = Depends(check_token)):
                     "function": {
                         "name": tool.name,
                         "description": tool.description or "",
-                        "parameters": tool.inputSchema,
+                        "parameters": sanitize_tool_schema(tool.inputSchema),
                     },
                 }
                 for tool in available_tools
@@ -170,7 +201,8 @@ async def chat(body: ChatRequestTest,  user: Session = Depends(check_token)):
 
             for _ in range(MAX_TOOL_ITERATIONS):
                 stream = provider.chat(
-                    model, messages, False, tools=ollama_tools)
+                    model, messages, False, tools=ollama_tools,
+                    options=SAMPLING_OPTIONS)
 
                 # Bill this call. Note the input token count climbs every
                 # iteration because `messages` keeps growing.
@@ -210,6 +242,10 @@ async def chat(body: ChatRequestTest,  user: Session = Depends(check_token)):
                 for tool in tool_calls:
                     tool_name = tool.function.name
                     tool_args = tool.function.arguments
+
+                    if tool_name in USER_SCOPED_TOOLS:
+                        tool_args = {**tool_args,
+                                     "created_by": user["user_id"]}
 
                     result = await mcp.call_tool(tool_name, tool_args)
 
@@ -258,7 +294,9 @@ async def chat(body: ChatRequestTest,  user: Session = Depends(check_token)):
         else:
             answer_messages.append({"role": "user", "content": prompt})
 
-        stream = provider.chat(model, answer_messages, True, thinking=False)
+        stream = provider.chat(
+            model, answer_messages, True, thinking=False,
+            options=SAMPLING_OPTIONS)
         for chunk in stream:
 
             content = chunk.get("message", {}).get("content")

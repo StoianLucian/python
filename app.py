@@ -10,6 +10,7 @@ from errors.user import AppError
 from routers import (
     ai_chat,
     auth,
+    calories,
     chat_message,
     files,
     github,
@@ -93,4 +94,5 @@ app.include_router(chat_session.router)
 app.include_router(chat_message.router)
 app.include_router(skills.router)
 app.include_router(github.router)
+app.include_router(calories.router)
 app.mount("/mcp", mcp_app)

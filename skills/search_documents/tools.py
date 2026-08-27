@@ -25,8 +25,6 @@ def register_search_documents_tools(mcp: FastMCP):
             Args:
                 user_query: The user's natural language question or search query.
         """
-        
-        print("try============")
       
         try:
             context = return_context_2(user_query)

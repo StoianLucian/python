@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -20,9 +20,14 @@ class Skill(ABC):
     trigger: list[str]
     keywords: list[str]
 
-    @abstractmethod
     def register(self, mcp):
-        """Register MCP tools."""
+        """Register the skill's MCP tools.
+
+        Override this when a skill owns tool implementations. Skills that only
+        reuse tools already registered by another skill (declared in `tools`)
+        can leave this as the default no-op — registering again would create
+        duplicate tools on the MCP server.
+        """
 
     def directory(self) -> Path:
         path = Path(__file__).parent / self.name

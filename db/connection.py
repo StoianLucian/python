@@ -21,6 +21,13 @@ engine = create_engine(DB_URL or DATABASE_URL, pool_pre_ping=True)
 
 import db.schemas  # noqa: F401 — register all models on Base.metadata
 
+# Enable trigram matching before create_all so fuzzy product lookups
+# (repositories.calorie_repository.find_similar_products) work on a fresh DB.
+from sqlalchemy import text  # noqa: E402
+
+with engine.begin() as _conn:
+    _conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+
 Base.metadata.create_all(bind=engine)
 
 SessionLocal = sessionmaker(
@@ -28,6 +35,15 @@ SessionLocal = sessionmaker(
     autoflush=False,
     bind=engine
 )
+
+# Seed the fixed food categories so `add_food_entry` can always resolve one.
+from db.schemas.food_category import seed_food_categories  # noqa: E402
+
+_seed_session = SessionLocal()
+try:
+    seed_food_categories(_seed_session)
+finally:
+    _seed_session.close()
 
 
 def get_db():

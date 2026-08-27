@@ -5,3 +5,6 @@ from .chunk import Chunk
 from .file import File
 from .skill import Skill
 from .user import User
+from .food_category import FoodCategory
+from .food_product import FoodProduct
+from .food_entry import FoodEntry
