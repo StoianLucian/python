@@ -1,5 +1,5 @@
 from skills.base import Skill
-from skills.calories.tools import register_calorie_tools
+from skills.add_calories.tools import register_calorie_tools
 
 
 class CaloriesSkill(Skill):

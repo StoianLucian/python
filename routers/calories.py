@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 
 from repositories import *
 from repositories.calorie_repository import find_product_by_name
-from skills.calories.tools import ProductLookup, _search_food_macros
+from skills.add_calories.tools import ProductLookup, _search_food_macros
 
 router = APIRouter(
     prefix="/calories",

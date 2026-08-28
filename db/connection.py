@@ -1,5 +1,6 @@
 
 import os
+# from python.db.schemas.exercise_category import seed_exercise_categories
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from db.schemas.base import Base
@@ -42,6 +43,7 @@ from db.schemas.food_category import seed_food_categories  # noqa: E402
 _seed_session = SessionLocal()
 try:
     seed_food_categories(_seed_session)
+    # seed_exercise_categories(_seed_session)
 finally:
     _seed_session.close()
 
