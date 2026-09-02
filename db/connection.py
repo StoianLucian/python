@@ -1,10 +1,9 @@
 
-import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from db.schemas.base import Base
 
-from config.db_config import DB_CONFIG
+from config.db_config import resolve_db_url
 from dotenv import load_dotenv
 
 from db.schemas.food_category import seed_food_categories  # noqa: E402
@@ -13,15 +12,7 @@ from db.schemas.exercise_category import seed_exercise_categories  # noqa: E402
 
 load_dotenv()
 
-DATABASE_URL = (
-    f"postgresql://{DB_CONFIG['user']}:{DB_CONFIG['password']}"
-    f"@{DB_CONFIG['host']}:{DB_CONFIG.get('port', 5432)}"
-    f"/{DB_CONFIG['main_database']}"
-)
-
-DB_URL = os.getenv("DB_URL")
-
-engine = create_engine(DB_URL or DATABASE_URL, pool_pre_ping=True)
+engine = create_engine(resolve_db_url(), pool_pre_ping=True)
 
 import db.schemas  # noqa: F401 — register all models on Base.metadata
 

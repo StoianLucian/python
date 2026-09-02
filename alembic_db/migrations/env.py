@@ -24,13 +24,14 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Point Alembic at the same database the app uses. DB_URL (from .env or the
-# environment) wins over the sqlalchemy.url in alembic.ini, so pointing the app
-# at Neon also points migrations at Neon.
+# Point Alembic at the same database the app uses. resolve_db_url() reads
+# DB_URL / DATABASE_URL from the environment (normalizing the legacy
+# postgres:// scheme) and only falls back to localhost when neither is set, so
+# migrations always target the same DB as the app.
 load_dotenv()
-_db_url = os.getenv("DB_URL")
-if _db_url:
-    config.set_main_option("sqlalchemy.url", _db_url)
+from config.db_config import resolve_db_url  # noqa: E402
+
+config.set_main_option("sqlalchemy.url", resolve_db_url())
 
 # Model metadata for 'autogenerate' support. Importing db.schemas registers
 # every model on Base.metadata.
