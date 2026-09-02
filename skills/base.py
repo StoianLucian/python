@@ -1,3 +1,4 @@
+import inspect
 from abc import ABC
 from pathlib import Path
 from dataclasses import dataclass
@@ -30,12 +31,16 @@ class Skill(ABC):
         """
 
     def directory(self) -> Path:
-        path = Path(__file__).parent / self.name
+        # Resolve the skill's own folder from where its subclass is defined
+        # (skills/<folder>/skill.py) rather than from ``self.name``. The
+        # human-facing name (e.g. "calories", "email") intentionally differs
+        # from the folder name (add_calories, send_email), so coupling the two
+        # would break skill lookups.
+        path = Path(inspect.getfile(type(self))).resolve().parent
 
         if not path.is_dir():
             raise FileNotFoundError(
-                f"{type(self).__name__}: no skill directory at '{path}'. "
-                f"The folder must be named after the skill's name ('{self.name}')."
+                f"{type(self).__name__}: no skill directory at '{path}'."
             )
 
         return path
