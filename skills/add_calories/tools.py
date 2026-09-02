@@ -292,7 +292,7 @@ def register_calorie_tools(mcp: FastMCP):
             return ToolResponse(
                 success=True,
                 result=LoggedFood(
-                    name=entry.name,
+                    name=product.name,
                     grams=entry.grams,
                     category=get_category_name(db, entry.food_category_id, FoodCategory),
                     calories=entry.calories,
