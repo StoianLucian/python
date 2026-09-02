@@ -181,7 +181,7 @@ def register_calorie_tools(mcp: FastMCP):
         """
         db = SessionLocal()
         try:
-            product = find_product_by_name(name, FoodCategory)
+            product = find_product_by_name(name)
             print(product, "catalog hit=====" if product else "catalog miss=====")
             if product:
                 return ToolResponse(

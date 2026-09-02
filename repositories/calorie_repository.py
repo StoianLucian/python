@@ -66,7 +66,7 @@ def upsert_product(
     """Find an existing product by name or create it. Existing rows are
     returned unchanged (the first stored macros and category win, so known
     foods stay stable across users)."""
-    existing = find_product_by_name(name, FoodProduct)
+    existing = find_product_by_name(name)
     if existing:
         return existing
 
