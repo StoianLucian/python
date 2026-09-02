@@ -1,12 +1,15 @@
 
 import os
-# from python.db.schemas.exercise_category import seed_exercise_categories
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from db.schemas.base import Base
 
 from config.db_config import DB_CONFIG
 from dotenv import load_dotenv
+
+from db.schemas.food_category import seed_food_categories  # noqa: E402
+from db.schemas.exercise_category import seed_exercise_categories  # noqa: E402
+
 
 load_dotenv()
 
@@ -37,13 +40,11 @@ SessionLocal = sessionmaker(
     bind=engine
 )
 
-# Seed the fixed food categories so `add_food_entry` can always resolve one.
-from db.schemas.food_category import seed_food_categories  # noqa: E402
 
 _seed_session = SessionLocal()
 try:
     seed_food_categories(_seed_session)
-    # seed_exercise_categories(_seed_session)
+    seed_exercise_categories(_seed_session)
 finally:
     _seed_session.close()
 

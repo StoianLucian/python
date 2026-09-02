@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import List, Optional
+from typing import List, Optional, Type
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -21,15 +21,6 @@ def find_category_by_name(db: Session, name: str) -> Optional[FoodCategory]:
         .first()
     )
 
-
-def get_category_name(db: Session, category_id: Optional[int]) -> Optional[str]:
-    """Return the category name for an id, or None."""
-    if category_id is None:
-        return None
-    category = db.get(FoodCategory, category_id)
-    return category.name if category else None
-
-
 def find_product_by_name(name: str) -> Optional[FoodProduct]:
     """Resolve a product in the shared catalog by name, tolerant of plurals and
     typos ("potato" / "potatoes" / "potatoe" all resolve to the same row).
@@ -38,23 +29,24 @@ def find_product_by_name(name: str) -> Optional[FoodProduct]:
     enough. Used on the identity/dedup path (lookup + upsert), so the threshold
     is stricter than `find_similar_products` to avoid merging distinct foods
     (e.g. "chicken" vs "chicken breast")."""
-    best = find_similar_products(name, limit=1, threshold=0.6)
+    best = find_similar(name, FoodProduct, limit=1, threshold=0.6,)
     return best[0] if best else None
 
 
-def find_similar_products(
+def find_similar(
     name: str,
+    entity_type: Type,
     limit: int = 5,
     threshold: float = 0.3,
-) -> List[FoodProduct]:
+) -> List[Type]:
     db = SessionLocal()
     normalized = name.strip().lower()
     if not normalized:
         return []
 
-    score = func.similarity(func.lower(FoodProduct.name), normalized)
+    score = func.similarity(func.lower(entity_type.name), normalized)
     return (
-        db.query(FoodProduct)
+        db.query(entity_type)
         .filter(score >= threshold)
         .order_by(score.desc())
         .limit(limit)
@@ -74,7 +66,7 @@ def upsert_product(
     """Find an existing product by name or create it. Existing rows are
     returned unchanged (the first stored macros and category win, so known
     foods stay stable across users)."""
-    existing = find_product_by_name(name)
+    existing = find_product_by_name(name, FoodProduct)
     if existing:
         return existing
 
@@ -105,7 +97,6 @@ def create_food_entry(
 
     entry = FoodEntry(
         product_id=product.id,
-        name=product.name,
         grams=grams,
         calories=round(product.calories_per_100g * factor, 2),
         protein=round(product.protein_per_100g * factor, 2),

@@ -8,3 +8,6 @@ from .user import User
 from .food_category import FoodCategory
 from .food_product import FoodProduct
 from .food_entry import FoodEntry
+from .exercise_category import ExerciseCategory
+from .exercises import Exercise
+from .exercise_entry import ExerciseEntry

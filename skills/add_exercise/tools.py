@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from tavily import TavilyClient
 
 from db.connection import SessionLocal
+from db.schemas.exercise_category import ExerciseCategory
 from db.schemas.food_category import DEFAULT_FOOD_CATEGORIES, FoodCategory
 from import_folder.response import ToolResponse
 from lmm.factory import get_lmm_provider
@@ -20,17 +21,18 @@ from repositories.calorie_repository import (
     upsert_product,
 )
 from services.search import search_web
+from skills.add_calories.tools import ProductLookup
 from tools.helpers import get_category_name
 
-class ProductLookup(BaseModel):
+
+class ExerciseLookup(BaseModel):
     found: bool
     name: str
-    source: Optional[str] = None  # "catalog" or "web" when found
-    category: Optional[str] = None  # set when a catalog product is categorized
-    calories_per_100g: Optional[float] = None
-    protein_per_100g: Optional[float] = None
-    carbs_per_100g: Optional[float] = None
-    fat_per_100g: Optional[float] = None
+    source: Optional[str] = None
+    category: Optional[str] = None
+    calories_per_rep: Optional[int]
+    calories_per_minute: Optional[int]
+    exercise_category: int
 
 
 _MACRO_KEYS = (
@@ -124,22 +126,35 @@ def _parse_macros(text: str) -> Optional[dict]:
     return macros
 
 
-def _search_food_macros(name: str) -> Optional[dict]:
-    """Search the web for a food's nutrition facts and extract the four per-100g
-    macros. Extracts from ONE source at a time, highest-scored first, and
-    returns the first result that parses and passes the plausibility check —
-    this avoids asking the model to reconcile several sources that mix per-100g
-    and per-serving numbers. Returns None if no source yields usable macros."""
+def _search_exercise_calories(name: str) -> Optional[dict]:
+    """Search the web for exercise calories consumtion per repetion or time"""
+    api_key = os.getenv("TAVILY_SEARCH_KEY")
+    if not api_key:
+        print("[_search_exercise_calories] TAVILY_SEARCH_KEY not set; cannot web-search")
+        return None
 
-    query = f"{name} nutrition facts per 100g calories protein carbs fat",
-    macros = search_web(query)
+    try:
+        client = TavilyClient(api_key)
+        response = client.search(
+            query=f"{name} nutrition facts per 100g calories protein carbs fat",
+            search_depth="advanced",
+            max_results=5,
+        )
+        print(response, "response product search ===========")
+    except Exception as e:
+        print(f"[lookup_product] web search failed: {e}")
+        return None
 
     model = _extraction_model()
     if not model:
         print("[lookup_product] no extraction model available")
         return None
 
-
+    results = sorted(
+        response.get("results", []),
+        key=lambda r: r.get("score", 0),
+        reverse=True,
+    )
     reply = get_lmm_provider().chat(
         "granite4.1:3b",
         [
@@ -162,10 +177,10 @@ class LoggedFood(BaseModel):
     today_total_calories: float = 0.0  # user's total kcal for today after this
 
 
-def register_calorie_tools(mcp: FastMCP):
+def register_exercises_tools(mcp: FastMCP):
 
     @mcp.tool
-    async def lookup_exercise(name: str) -> ToolResponse[ProductLookup]:
+    async def lookup_exercise(name: str) -> ToolResponse[ExerciseLookup]:
         """
         Resolve a food's macros PER 100g. Checks the shared catalog first and, on
         a miss, searches the web for the nutrition facts automatically.
@@ -181,27 +196,24 @@ def register_calorie_tools(mcp: FastMCP):
         """
         db = SessionLocal()
         try:
-            product = find_product_by_name(name, FoodCategory)
-            print(product, "catalog hit=====" if product else "catalog miss=====")
-            if product:
+            exercise = find_product_by_name(name)
+            print(exercise, "catalog hit=====" if exercise else "catalog miss=====")
+            if exercise:
                 return ToolResponse(
                     success=True,
-                    result=ProductLookup(
+                    result=ExerciseLookup(
                         found=True,
-                        name=product.name,
+                        name=exercise.name,
                         source="catalog",
                         category=get_category_name(
-                            db, product.food_category_id, FoodCategory),
-                        calories_per_100g=product.calories_per_100g,
-                        protein_per_100g=product.protein_per_100g,
-                        carbs_per_100g=product.carbs_per_100g,
-                        fat_per_100g=product.fat_per_100g,
+                            db, exercise.food_category_id, ExerciseCategory),
                     ),
                 )
 
             # Not in the catalog — fall back to a web search + extraction so the
             # model gets usable macros without having to chain another tool.
-            macros = _search_food_macros(name)
+            query = f"{name} nutrition facts per 100g calories protein carbs fat",
+            macros = search_web(query)
             if macros:
                 return ToolResponse(
                     success=True,
@@ -294,7 +306,7 @@ def register_calorie_tools(mcp: FastMCP):
                 result=LoggedFood(
                     name=entry.name,
                     grams=entry.grams,
-                    category=get_category_name(db, entry.food_category_id, FoodCategory),
+                    category=get_category_name(db, entry.food_category_id),
                     calories=entry.calories,
                     protein=entry.protein,
                     carbs=entry.carbs,
