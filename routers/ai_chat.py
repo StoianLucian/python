@@ -13,6 +13,7 @@ from fastapi.responses import StreamingResponse
 import copy
 import json
 from fastmcp import Client
+from import_folder.mcp_server import mcp as mcp_server
 
 from repositories import *
 from tools.cache.mcp_tools_cache import MCPToolsCache
@@ -40,7 +41,11 @@ class ChatRequestTest(BaseModel):
     model: str
 
 
-mcp = Client("http://localhost:8000/mcp")
+# Connect to the in-process FastMCP server directly (in-memory transport).
+# Passing the server instance avoids an HTTP round-trip to ourselves, so it
+# works regardless of the port uvicorn binds to (e.g. Render's $PORT) and needs
+# no separate MCP server process.
+mcp = Client(mcp_server)
 
 
 # Tools whose `created_by` must be filled from the authenticated user, never
