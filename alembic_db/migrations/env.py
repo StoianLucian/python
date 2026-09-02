@@ -1,9 +1,19 @@
+import os
+import sys
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
+
+# Make the project root importable so we can pull in the models below. env.py
+# lives at <root>/alembic_db/migrations/env.py, so the root is two levels up.
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+)
+
+from dotenv import load_dotenv  # noqa: E402
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -14,11 +24,20 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-target_metadata = None
+# Point Alembic at the same database the app uses. DB_URL (from .env or the
+# environment) wins over the sqlalchemy.url in alembic.ini, so pointing the app
+# at Neon also points migrations at Neon.
+load_dotenv()
+_db_url = os.getenv("DB_URL")
+if _db_url:
+    config.set_main_option("sqlalchemy.url", _db_url)
+
+# Model metadata for 'autogenerate' support. Importing db.schemas registers
+# every model on Base.metadata.
+from db.schemas.base import Base  # noqa: E402
+import db.schemas  # noqa: F401,E402
+
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

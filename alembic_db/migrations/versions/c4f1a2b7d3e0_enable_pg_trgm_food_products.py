@@ -1,8 +1,8 @@
 """enable pg_trgm and add trigram index on food_products.name
 
 Revision ID: c4f1a2b7d3e0
-Revises: b269babcdcd7
-Create Date: 2026-08-25 00:00:00.000000
+Revises: 50ab0f7674a2
+Create Date: 2026-09-02 11:30:00.000000
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'c4f1a2b7d3e0'
-down_revision: Union[str, Sequence[str], None] = 'b269babcdcd7'
+down_revision: Union[str, Sequence[str], None] = '50ab0f7674a2'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
