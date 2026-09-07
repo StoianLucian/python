@@ -2,6 +2,7 @@ import inspect
 from abc import ABC
 from pathlib import Path
 from dataclasses import dataclass
+from typing import Optional
 
 
 class Skill(ABC):
@@ -60,3 +61,15 @@ class Skill(ABC):
             return path.read_text()
 
         return ""
+
+    def render_response(self, tool_history: list[dict]) -> Optional[list[dict]]:
+        """Optionally build the final response objects deterministically from
+        the tool results, bypassing the answer-generation model call.
+
+        Return a list of response objects (the same JSON-array shape the model
+        would emit) to short-circuit generation, or ``None`` to let the model
+        produce the answer. Use this when the tool result already contains the
+        finished answer and re-synthesizing it through a small local model is
+        unreliable.
+        """
+        return None

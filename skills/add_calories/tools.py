@@ -144,7 +144,7 @@ def _search_food_macros(name: str) -> Optional[dict]:
         "granite4.1:3b",
         [
             {"role": "system", "content": _EXTRACTION_SYSTEM_PROMPT},
-            {"role": "user", "content": f"Food: {name}\n\nSource:\n{results}"},
+            {"role": "user", "content": f"Food: {name}\n\nSource:\n{macros}"},
         ],
         format=_MACRO_FORMAT,
     )

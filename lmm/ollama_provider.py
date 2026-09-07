@@ -1,4 +1,4 @@
-from ollama import Client
+from ollama import Client, ResponseError
 from .provider import LMMProvider
 
 class OllamaProvider(LMMProvider):
@@ -28,3 +28,43 @@ class OllamaProvider(LMMProvider):
             kwargs["tools"] = tools
 
         return self.client.chat(**kwargs)
+
+    def list_models(self):
+        models = self.client.list()
+
+        return [
+            {
+                "name": m["model"],
+                "id": m["model"],
+            }
+            for m in models["models"]
+            if "embed" not in m["model"].lower()
+        ]
+
+    def is_model_installed(self, model_name: str) -> bool:
+        try:
+            self.client.show(model_name)
+            return True
+        except ResponseError as e:
+            print(e)
+            return False
+
+    def iter_stream(self, stream):
+        for chunk in stream:
+            message = chunk.get("message", {})
+            done = bool(chunk.get("done"))
+
+            usage = None
+            if done:
+                # Ollama puts the token counts on the final (done) chunk.
+                usage = {
+                    "input": chunk.get("prompt_eval_count") or 0,
+                    "output": chunk.get("eval_count") or 0,
+                }
+
+            yield {
+                "content": message.get("content"),
+                "thinking": message.get("thinking"),
+                "done": done,
+                "usage": usage,
+            }

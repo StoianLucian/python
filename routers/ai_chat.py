@@ -1,9 +1,6 @@
-from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends
-from db.connection import get_db
-from db.schemas.chunk import Chunk
 from lmm.factory import get_lmm_provider
 from lmm.usage import TokenUsage
 from repositories.ai_chat_repository import is_model_installed, return_available_models
@@ -39,6 +36,7 @@ class Message(BaseModel):
 class ChatRequestTest(BaseModel):
     messages: list[Message]
     model: str
+    provider: Optional[str] = None
 
 
 # Connect to the in-process FastMCP server directly (in-memory transport).
@@ -146,7 +144,7 @@ Examples:
 
 @router.post("/")
 async def chat(body: ChatRequestTest,  user: Session = Depends(check_token)):
-    provider = get_lmm_provider()
+    provider = get_lmm_provider(body.provider)
     user_messages = body.messages
     model = body.model
 
@@ -172,8 +170,6 @@ async def chat(body: ChatRequestTest,  user: Session = Depends(check_token)):
     if mentioned_skill:
         async with mcp:
             tools = await MCPToolsCache.get_tools(mcp=mcp)
-            
-            print(mentioned_skill, "========== mentiond")
 
             messages = [
                 {"role": "system", "content": tool_phase_prompt},
@@ -277,9 +273,13 @@ async def chat(body: ChatRequestTest,  user: Session = Depends(check_token)):
                 "content": (
                     f"Skill output contract for '{mentioned_skill.name}'.\n"
                     "These instructions take precedence over the generic response\n"
-                    "format above. Any object type used in the examples below is\n"
-                    "allowed, including its extra fields, and must be reproduced\n"
-                    "exactly as shown.\n\n"
+                    "format above.\n\n"
+                    "The contract below defines the SHAPE of your response ONLY.\n"
+                    "Any object type shown is allowed, including its extra fields,\n"
+                    "and you must match the structure exactly. But every VALUE\n"
+                    "(text, labels, URLs, numbers) MUST come from the actual tool\n"
+                    "results in this conversation. Any '...' or field-name text in\n"
+                    "the contract is a placeholder — never emit it literally.\n\n"
                     f"{mentioned_skill.examples()}"
                 ),
             })
@@ -289,8 +289,13 @@ async def chat(body: ChatRequestTest,  user: Session = Depends(check_token)):
                 "role": "system",
                 "content": (
                     "All tool calls are complete. Do not call any more tools.\n"
-                    "Report the outcome of the tool results to the user as a JSON array,\n"
-                    f"following the '{mentioned_skill.name}' output contract exactly.\n"
+                    f'Answer the user\'s question: "{clean_message}"\n'
+                    "Use ONLY the facts in the preceding 'tool' messages — build every\n"
+                    "field of your answer (text, labels, URLs) from the values found\n"
+                    "there. Do not use any topic, fact, or URL that is not in those\n"
+                    "tool results.\n"
+                    "Reply as a JSON array following the "
+                    f"'{mentioned_skill.name}' output contract exactly.\n"
                     "Emit one object per item from the tool results — never collapse them\n"
                     "into a single text object.\n"
                     "Never restate the arguments you passed to a tool."
@@ -300,24 +305,22 @@ async def chat(body: ChatRequestTest,  user: Session = Depends(check_token)):
             answer_messages.append({"role": "user", "content": prompt})
 
         stream = provider.chat(
-            model, answer_messages, True, thinking=False,
+            model, answer_messages, True, thinking=True,
             options=SAMPLING_OPTIONS)
-        for chunk in stream:
-
-            content = chunk.get("message", {}).get("content")
-            thinking = chunk.get("message", {}).get("thinking")
-            isDone = chunk.get("done")
+        for chunk in provider.iter_stream(stream):
+            content = chunk["content"]
+            thinking = chunk["thinking"]
 
             if content or thinking:
                 yield json.dumps({
                     "content": content,
                     "thinking": thinking,
-                    "done": isDone
+                    "done": chunk["done"]
                 }) + "\n"
 
-            if chunk.get("done"):
-                # Ollama puts the token counts on the final (done) chunk.
-                usage.add_ollama(chunk)
+            if chunk["done"]:
+                if chunk["usage"]:
+                    usage.add(chunk["usage"]["input"], chunk["usage"]["output"])
                 print(f"final request usage: {usage.to_dict()}")
                 # Emit the bill as a last event so the client can display it.
                 yield json.dumps({"usage": usage.to_dict(), "done": True}) + "\n"
@@ -331,6 +334,7 @@ async def chat(body: ChatRequestTest,  user: Session = Depends(check_token)):
 
 class PingRequest(BaseModel):
     model: str
+    provider: Optional[str] = None
 
 
 @router.post("/ping")
@@ -338,15 +342,43 @@ def chat(body: PingRequest):
     model = body.model
 
     try:
-        return is_model_installed(model)
+        # Route through the provider factory so the check honors the requested
+        # provider (ollama vs google), not just the Ollama-only repository path.
+        return get_lmm_provider(body.provider).is_model_installed(model)
     except Exception as e:
         raise e
 
 
 @router.get("/models")
-def return_models():
+def return_models(provider: Optional[str] = None):
     try:
-        models = return_available_models()
+        models = get_lmm_provider(provider).list_models()
         return models
     except Exception as e:
         raise e
+
+
+class DummyChatRequest(BaseModel):
+    prompt: str
+    model: str
+
+
+@router.post("/dummy")
+def dummy_chat(body: DummyChatRequest):
+    """Minimal non-streaming call to the active provider — handy for smoke-testing
+    Gemini (or any provider) end to end without the tool/streaming machinery."""
+    provider = get_lmm_provider()
+
+    response = provider.chat(
+        body.model,
+        [{"role": "user", "content": body.prompt}],
+        stream=False,
+        options=SAMPLING_OPTIONS,
+    )
+
+    # Gemini returns a genai response object; Ollama returns a dict-like message.
+    text = getattr(response, "text", None)
+    if text is None:
+        text = response.get("message", {}).get("content")
+
+    return {"model": body.model, "response": text}

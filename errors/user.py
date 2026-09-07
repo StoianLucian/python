@@ -74,3 +74,12 @@ class SessionNotFound(AppError):
             error_code="session_not_found",
             status_code=404
         )
+
+
+class SkillAlreadyExistsError(AppError):
+    def __init__(self):
+        super().__init__(
+            message="Skill already exists",
+            error_code="skill_exists",
+            status_code=409
+        )

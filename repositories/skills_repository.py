@@ -1,8 +1,11 @@
 
 from datetime import datetime
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, load_only
 from db.schemas.skill import Skill
+from errors.user import SkillAlreadyExistsError
+from schemas import SkillCreate
 
 
 def populate_skills(db: Session):
@@ -36,3 +39,23 @@ def get_skills_db(db: Session, search: str):
         skills = db.query(Skill).all()
 
     return skills
+
+
+def create_skill_db(skillData: SkillCreate, db: Session):
+    existing = db.query(Skill).filter(
+        or_(Skill.name == skillData.name, Skill.key == skillData.key)
+    ).first()
+
+    if existing is not None:
+        raise SkillAlreadyExistsError()
+
+    skill = Skill(
+        name=skillData.name,
+        key=skillData.key,
+        created_at=datetime.now(),
+    )
+
+    db.add(skill)
+    db.commit()
+    db.refresh(skill)
+    return skill

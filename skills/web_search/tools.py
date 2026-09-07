@@ -54,10 +54,23 @@ def register_web_search_tools(mcp: FastMCP):
             client = TavilyClient(TAVILY_SEARCH_KEY)
             response = client.search(
                 query=user_query,
-                search_depth="advanced"
+                search_depth="advanced",
+                include_answer="advanced",
             )
 
-            result = WebSearchResponse.model_validate(response)
+            result = WebSearchResponse(
+                query=response.get("query", user_query),
+                answer=response.get("answer"),
+                results=[
+                    WebSearchResult(
+                        title=r.get("title", ""),
+                        url=r.get("url", ""),
+                        content=r.get("content", ""),
+                        score=r.get("score", 0.0),
+                    )
+                    for r in response.get("results", [])
+                ],
+            )
 
             return ToolResponse(success=True, result=result)
 
