@@ -8,7 +8,7 @@ from db.schemas.file import File as FileModel
 from errors.user import EmptyPDFFileError, PDFFileSupportedError
 from helpers.helpers import sanitize_input, split_sentences
 from repositories.ai_chat_repository import get_embedding, return_available_embedding_models
-from repositories.files_repository import upload_file_db, reset_files_db
+from repositories.files_repository import upload_file_db, reset_files_db, UPLOAD_FOLDER
 from repositories.auth_repository import check_token
 from db.connection import get_db
 from repositories.ai_chat_repository import create_chunk
@@ -20,7 +20,6 @@ router = APIRouter(
     tags=["files"],
 )
 
-UPLOAD_FOLDER = "PDFS"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 

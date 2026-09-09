@@ -11,6 +11,7 @@ from db.schemas.user import User
 from difflib import get_close_matches
 
 from db.schemas.chunk import Chunk
+from lmm.factory import get_lmm_provider
 
 modelUrl = os.getenv("MODEL_URL")
 
@@ -109,13 +110,14 @@ def return_available_models():
         raise e
 
 
-def return_available_embedding_models():
-    models = client.list()
+def return_available_embedding_models(provider: str = "ollama"):
+    models = get_lmm_provider(provider).client.list()
 
     model_names = [
         {
             "name": m["model"],
-            "id": m["model"]
+            "id": m["model"],
+            "provider": provider
         }
         for m in models["models"]
         if "embed" in m["model"].lower()
