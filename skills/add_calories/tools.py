@@ -131,20 +131,19 @@ def _search_food_macros(name: str) -> Optional[dict]:
     this avoids asking the model to reconcile several sources that mix per-100g
     and per-serving numbers. Returns None if no source yields usable macros."""
 
-    query = f"{name} nutrition facts per 100g calories protein carbs fat",
-    macros = search_web(query)
-
-    model = _extraction_model()
-    if not model:
-        print("[lookup_product] no extraction model available")
+    query = f"{name} nutrition facts per 100g calories protein carbs fat"
+    response = search_web(query)
+    if not response:
         return None
 
+    # Prefer Tavily's answer summary, falling back to the raw result snippets.
+    source = response.get("answer") or response.get("results")
 
     reply = get_lmm_provider().chat(
         "granite4.1:3b",
         [
             {"role": "system", "content": _EXTRACTION_SYSTEM_PROMPT},
-            {"role": "user", "content": f"Food: {name}\n\nSource:\n{macros}"},
+            {"role": "user", "content": f"Food: {name}\n\nSource:\n{source}"},
         ],
         format=_MACRO_FORMAT,
     )
@@ -165,7 +164,7 @@ class LoggedFood(BaseModel):
 def register_calorie_tools(mcp: FastMCP):
 
     @mcp.tool
-    async def lookup_exercise(name: str) -> ToolResponse[ProductLookup]:
+    async def lookup_product(name: str) -> ToolResponse[ProductLookup]:
         """
         Resolve a food's macros PER 100g. Checks the shared catalog first and, on
         a miss, searches the web for the nutrition facts automatically.

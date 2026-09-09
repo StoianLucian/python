@@ -1,27 +1,28 @@
 from skills.base import Skill
-from skills.add_calories.tools import register_calorie_tools
+from skills.add_exercise.tools import register_exercises_tools
 
 
-class CaloriesSkill(Skill):
-    name = "add exercises"
+class ExerciseSkill(Skill):
+    name = "exercises"
     description = (
-        "Track calories and macros (protein, carbs, fat) for foods the user "
-        "eats, given the food and the amount in grams."
+        "Track calories burned for exercises the user did, given the exercise "
+        "and the amount (repetitions for rep-based exercises, minutes for "
+        "duration-based ones)."
     )
     keywords = [
-        "calories",
-        "calorie",
-        "kcal",
-        "macros",
-        "protein",
-        "carbs",
-        "fat",
-        "ate",
-        "eat",
+        "exercise",
+        "workout",
+        "reps",
+        "repetitions",
+        "pushups",
+        "push-ups",
+        "squats",
+        "running",
+        "cardio",
+        "burned",
     ]
     trigger = ["/add_exercise"]
-    # tools = ["lookup_exercise", "add_exercise_entry", "get_daily_totals_tool"]
-    tools = ["lookup_exercise"]
+    tools = ["lookup_exercise", "add_exercise_entry", "get_exercise_daily_totals"]
 
     def register(self, mcp):
-        register_calorie_tools(mcp)
+        register_exercises_tools(mcp)

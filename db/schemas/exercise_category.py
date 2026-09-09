@@ -5,11 +5,12 @@ from db.schemas.base import Base
 
 
 class ExerciseCategory(Base):
-    """A fixed catalog of exercise categories categories (vegetable, meat, sweets, ...).
+    """A fixed catalog of exercise categories (muscle groups: chest, back,
+    cardio, ...).
 
-    Referenced by `exercises.food_category_id` (the source of truth for a
-    exercises's category) and denormalized onto `.food_category_id` at
-    log time.
+    Referenced by `exercises.exercise_category` (the source of truth for an
+    exercise's category) and denormalized onto `exercise_entry.exercise_category`
+    at log time.
     """
 
     __tablename__ = "exercise_categories"

@@ -1,112 +1,80 @@
 import json
-import os
 import re
 from datetime import date, datetime
 from typing import Optional
 
 from fastmcp import FastMCP
 from pydantic import BaseModel
-from tavily import TavilyClient
 
 from db.connection import SessionLocal
-from db.schemas.exercise_category import ExerciseCategory
-from db.schemas.food_category import DEFAULT_FOOD_CATEGORIES, FoodCategory
+from db.schemas.exercise_category import DEFAULT_EXERCISE_CATEGORIES, ExerciseCategory
 from import_folder.response import ToolResponse
 from lmm.factory import get_lmm_provider
-from repositories.calorie_repository import (
-    create_food_entry,
-    find_category_by_name,
-    find_product_by_name,
-    get_daily_totals,
-    upsert_product,
+from repositories.exercise_repository import (
+    create_exercise_entry,
+    find_exercise_by_name,
+    find_exercise_category_by_name,
+    get_daily_exercise_totals,
+    upsert_exercise,
 )
 from services.search import search_web
-from skills.add_calories.tools import ProductLookup
 from tools.helpers import get_category_name
 
 
 class ExerciseLookup(BaseModel):
     found: bool
     name: str
-    source: Optional[str] = None
+    source: Optional[str] = None  # "catalog" or "web" when found
+    # set when a catalog exercise is categorized
     category: Optional[str] = None
-    calories_per_rep: Optional[int]
-    calories_per_minute: Optional[int]
-    exercise_category: int
+    type: Optional[str] = None  # "reps" or "duration"
+    calories_per_rep: Optional[float] = None
+    calories_per_minute: Optional[float] = None
 
 
-_MACRO_KEYS = (
-    "calories_per_100g",
-    "protein_per_100g",
-    "carbs_per_100g",
-    "fat_per_100g",
-)
-
-
-class _MacroExtraction(BaseModel):
+class _ExerciseExtraction(BaseModel):
     """Schema the extraction model is forced to emit (via Ollama's `format`).
-    Constrains decoding to exactly the four per-100g macros as numbers/null, so
-    the reply is always valid JSON in this shape — no prose, fences, or
-    reasoning to scrape."""
+    Constrains decoding to the burn rates and the type, so the reply is always
+    valid JSON in this shape — no prose, fences, or reasoning to scrape."""
 
-    calories_per_100g: Optional[float] = None
-    protein_per_100g: Optional[float] = None
-    carbs_per_100g: Optional[float] = None
-    fat_per_100g: Optional[float] = None
+    type: Optional[str] = None
+    calories_per_rep: Optional[float] = None
+    calories_per_minute: Optional[float] = None
 
 
 # JSON Schema passed as Ollama's `format=` to enforce structured output.
-_MACRO_FORMAT = _MacroExtraction.model_json_schema()
+_EXERCISE_FORMAT = _ExerciseExtraction.model_json_schema()
 
 _EXTRACTION_SYSTEM_PROMPT = (
-    "You extract nutrition facts from web search snippets and return them PER "
-    "100 GRAMS of the food.\n\n"
+    "You estimate how many calories an exercise burns for an average 70 kg "
+    "adult, using web search snippets as a guide.\n\n"
     "OUTPUT FORMAT — follow exactly:\n"
-    "- Respond with a SINGLE raw JSON object and NOTHING else.\n"
-    "- Your entire reply must start with '{' and end with '}'.\n"
-    "- Do NOT include markdown, code fences (```), explanations, comments, or "
-    "any reasoning/thinking text before or after the JSON. /no_think\n"
-    "- Use exactly these four keys, in this order, with plain JSON numbers "
-    "(no units, no quotes) or null:\n"
-    '{"calories_per_100g": <kcal>, "protein_per_100g": <g>, '
-    '"carbs_per_100g": <g>, "fat_per_100g": <g>}\n\n'
-    "UNITS — read carefully, this is where mistakes happen:\n"
-    "- Pages often show TWO columns: one PER 100 g and one PER SERVING / PER "
-    "PORTION / PER PIECE (e.g. 'per portion (28g)'). Use ONLY the per-100 g "
-    "column.\n"
-    "- IGNORE per-serving / per-portion / per-piece numbers. Convert them to "
-    "per 100 g ONLY when a source gives no per-100 g figures at all, using the "
-    "serving weight in grams stated on that same source.\n"
-    "- Take all four values from the SAME source and SAME column — never mix "
-    "calories from one basis with macros from another.\n"
-    "- When sources disagree, prefer the official manufacturer's page.\n"
-    "- Sanity check: calories should be roughly 4·protein + 4·carbs + 9·fat. If "
-    "your four numbers break this badly, you mixed units — re-read and fix.\n"
-    "If a value truly cannot be determined, use null."
+    "- Respond with a SINGLE raw JSON object and NOTHING else, starting with "
+    "'{' and ending with '}'.\n"
+    "- Do NOT include markdown, code fences (```), explanations, or any "
+    "reasoning/thinking text. /no_think\n"
+    "- Use exactly these keys with plain JSON numbers (no units, no quotes) or "
+    "null:\n"
+    '{"type": "reps"|"duration", "calories_per_rep": <kcal>, '
+    '"calories_per_minute": <kcal>}\n\n'
+    "RULES:\n"
+    "- `type` is \"reps\" for exercises counted in repetitions (push-ups, "
+    "squats, sit-ups, pull-ups, lunges) and \"duration\" for time-based "
+    "exercises (running, cycling, swimming, walking, planks, jumping jacks).\n"
+    "- For a \"reps\" exercise you MUST give a POSITIVE calories_per_rep and set "
+    "calories_per_minute to null. Per-rep is a small DECIMAL — never 0 and never "
+    "a whole number like 5. Typical anchors: push-up ~0.3, sit-up ~0.15, squat "
+    "~0.32, pull-up ~1.0, burpee ~0.5, lunge ~0.35. If the snippets only give "
+    "per-minute, ESTIMATE per-rep from these anchors.\n"
+    "- For a \"duration\" exercise give calories_per_minute and set "
+    "calories_per_rep to null.\n"
+    "- Never output 0. If truly unknown, use your best positive estimate."
 )
 
-_test = {"only return json format as response of type"  '{"calories_per_100g": <kcal>, "protein_per_100g": <g>, '
-         '"carbs_per_100g": <g>, "fat_per_100g": <g>}\n\n'}
 
-
-def _extraction_model() -> Optional[str]:
-    """Pick the model used for macro extraction: the configured
-    CALORIE_EXTRACTION_MODEL, else the first model installed in Ollama."""
-    configured = os.getenv("CALORIE_EXTRACTION_MODEL")
-    if configured:
-        return configured
-    try:
-        listed = get_lmm_provider().client.list()
-        models = getattr(listed, "models", None) or listed.get("models", [])
-        first = models[0]
-        return getattr(first, "model", None) or first.get("model") or first.get("name")
-    except Exception:
-        return None
-
-
-def _parse_macros(text: str) -> Optional[dict]:
-    """Pull the first JSON object out of the model's reply and keep only the
-    four macro keys with numeric values."""
+def _parse_exercise(text: str) -> Optional[dict]:
+    """Pull the first JSON object out of the model's reply and keep the type and
+    the burn rate that matches it. Returns None on an unusable extraction."""
     if not text:
         return None
     match = re.search(r"\{.*\}", text, re.DOTALL)
@@ -117,86 +85,79 @@ def _parse_macros(text: str) -> Optional[dict]:
     except (ValueError, TypeError):
         return None
 
-    macros = {}
-    for key in _MACRO_KEYS:
-        value = data.get(key)
-        if not isinstance(value, (int, float)):
-            return None  # incomplete extraction — treat as a miss
-        macros[key] = float(value)
-    return macros
+    ex_type = data.get("type")
+    if ex_type not in ("reps", "duration"):
+        return None
+
+    per_rep = data.get("calories_per_rep")
+    per_minute = data.get("calories_per_minute")
+
+    # The rate that matches the type must be a usable positive number.
+    rate = per_rep if ex_type == "reps" else per_minute
+    if not isinstance(rate, (int, float)) or rate <= 0:
+        return None
+
+    return {
+        "type": ex_type,
+        "calories_per_rep": float(per_rep) if isinstance(per_rep, (int, float)) else None,
+        "calories_per_minute": float(per_minute) if isinstance(per_minute, (int, float)) else None,
+    }
 
 
 def _search_exercise_calories(name: str) -> Optional[dict]:
-    """Search the web for exercise calories consumtion per repetion or time"""
-    api_key = os.getenv("TAVILY_SEARCH_KEY")
-    if not api_key:
-        print("[_search_exercise_calories] TAVILY_SEARCH_KEY not set; cannot web-search")
+    """Search the web for an exercise's calorie burn and extract the type plus
+    the matching per-rep / per-minute rate. Returns None if nothing usable."""
+    query = f"{name} calories burned per rep and per minute average adult"
+    response = search_web(query)
+    if not response:
         return None
 
-    try:
-        client = TavilyClient(api_key)
-        response = client.search(
-            query=f"{name} nutrition facts per 100g calories protein carbs fat",
-            search_depth="advanced",
-            max_results=5,
-        )
-        print(response, "response product search ===========")
-    except Exception as e:
-        print(f"[lookup_product] web search failed: {e}")
-        return None
+    # Prefer Tavily's answer summary (a concise, denser source for the small
+    # extraction model), falling back to the raw result snippets.
+    source = response.get("answer") or response.get("results")
 
-    model = _extraction_model()
-    if not model:
-        print("[lookup_product] no extraction model available")
-        return None
-
-    results = sorted(
-        response.get("results", []),
-        key=lambda r: r.get("score", 0),
-        reverse=True,
-    )
     reply = get_lmm_provider().chat(
         "granite4.1:3b",
         [
             {"role": "system", "content": _EXTRACTION_SYSTEM_PROMPT},
-            {"role": "user", "content": f"Food: {name}\n\nSource:\n{results}"},
+            {"role": "user", "content": f"Exercise: {name}\n\nSource:\n{source}"},
         ],
-        format=_MACRO_FORMAT,
+        format=_EXERCISE_FORMAT,
     )
-    return _parse_macros(reply.message.content)
+    return _parse_exercise(reply.message.content)
 
 
-class LoggedFood(BaseModel):
+class LoggedExercise(BaseModel):
     name: str
-    grams: float
+    type: str
+    reps: Optional[int] = None
+    minutes: Optional[float] = None
     category: Optional[str] = None
-    calories: float
-    protein: float
-    carbs: float
-    fat: float
-    today_total_calories: float = 0.0  # user's total kcal for today after this
+    calories_burned: float
+    # user's total kcal burned today after this entry
+    today_total_calories_burned: float = 0.0
 
 
 def register_exercises_tools(mcp: FastMCP):
 
     @mcp.tool
-    async def lookup_exercise(name: str) -> ToolResponse[ExerciseLookup]:
+    async def lookup_exercise(name: str) -> ToolResponse:
         """
-        Resolve a food's macros PER 100g. Checks the shared catalog first and, on
-        a miss, searches the web for the nutrition facts automatically.
+        Resolve an exercise's calorie-burn rate. Checks the shared catalog first
+        and, on a miss, searches the web for the burn rate automatically.
 
-        ALWAYS call this first for each food the user mentions. If `found` is
-        true, the returned per-100g values are ready to use — pass them straight
-        to `add_food_entry`. If `found` is false, the macros could not be
-        determined; tell the user you couldn't find nutrition info for that food
-        and do NOT call `add_food_entry` for it.
+        ALWAYS call this first for each exercise the user mentions. If `found` is
+        true, the returned `type` and rate are ready to use — pass them straight
+        to `add_exercise_entry`. If `found` is false, the rate could not be
+        determined; tell the user you couldn't find data for that exercise and do
+        NOT call `add_exercise_entry` for it.
 
         Args:
-            name: The food name, e.g. "chicken breast", "white rice".
+            name: The exercise name, e.g. "push-ups", "running".
         """
         db = SessionLocal()
         try:
-            exercise = find_product_by_name(name)
+            exercise = find_exercise_by_name(name)
             print(exercise, "catalog hit=====" if exercise else "catalog miss=====")
             if exercise:
                 return ToolResponse(
@@ -206,28 +167,30 @@ def register_exercises_tools(mcp: FastMCP):
                         name=exercise.name,
                         source="catalog",
                         category=get_category_name(
-                            db, exercise.food_category_id, ExerciseCategory),
+                            db, exercise.exercise_category, ExerciseCategory),
+                        type=exercise.type,
+                        calories_per_rep=exercise.calories_per_rep,
+                        calories_per_minute=exercise.calories_per_minute,
                     ),
                 )
 
             # Not in the catalog — fall back to a web search + extraction so the
-            # model gets usable macros without having to chain another tool.
-            query = f"{name} nutrition facts per 100g calories protein carbs fat",
-            macros = search_web(query)
-            if macros:
+            # model gets a usable rate without having to chain another tool.
+            data = _search_exercise_calories(name)
+            if data:
                 return ToolResponse(
                     success=True,
-                    result=ProductLookup(
+                    result=ExerciseLookup(
                         found=True,
                         name=name,
                         source="web",
-                        **macros,
+                        **data,
                     ),
                 )
 
             return ToolResponse(
                 success=True,
-                result=ProductLookup(found=False, name=name),
+                result=ExerciseLookup(found=False, name=name),
             )
         except Exception as e:
             return ToolResponse(success=False, result=f"Error: {e}")
@@ -235,83 +198,104 @@ def register_exercises_tools(mcp: FastMCP):
             db.close()
 
     @mcp.tool
-    async def add_food_entry(
+    async def add_exercise_entry(
         name: str,
-        grams: float,
-        calories_per_100g: float,
-        protein_per_100g: float,
-        carbs_per_100g: float,
-        fat_per_100g: float,
+        type: str,
         category: str,
+        reps: Optional[int] = None,
+        minutes: Optional[float] = None,
+        calories_per_rep: Optional[float] = None,
+        calories_per_minute: Optional[float] = None,
         created_by: Optional[int] = None,
-    ) -> ToolResponse[LoggedFood]:
+    ) -> ToolResponse:
         """
-        Log a food the user ate and save it to the shared catalog for reuse.
+        Log an exercise the user did and save it to the shared catalog for reuse.
 
-        Only call this when the user has provided a positive amount in grams. If
-        the grams are missing or 0, do NOT call this tool — ask the user how many
-        grams they ate instead.
+        Pass the `type` and rate returned by `lookup_exercise`. Calories burned
+        are computed and returned:
+          - type "reps":     calories = reps * calories_per_rep
+          - type "duration": calories = minutes * calories_per_minute
 
-        Pass the macros PER 100g returned by `lookup_product` (from the catalog
-        or from its web-search fallback). The totals for the eaten amount are
-        computed as grams / 100 * per-100g and returned.
+        Only call this once you have the amount the type needs. For a "reps"
+        exercise you MUST have a positive `reps`; for a "duration" exercise you
+        MUST have positive `minutes`. If the needed amount is missing or 0, do
+        NOT call this tool — ask the user for it instead.
 
-        Classify the food into exactly ONE of these categories and pass it as
-        `category`: vegetable, fruit, meat, seafood, dairy, grains, legumes,
-        sweets, beverages, snacks, fats_oils, other. Use "other" if none fit.
+        Classify the exercise into exactly ONE of these muscle-group categories
+        and pass it as `category`: chest, back, shoulders, biceps, triceps,
+        forearms, core, glutes, quadriceps, hamstrings, calves, hips, full_body,
+        cardio, other. Use "other" if none fit.
 
         Args:
-            name: The food name.
-            grams: How many grams the user ate.
-            calories_per_100g: Calories (kcal) per 100g.
-            protein_per_100g: Protein (g) per 100g.
-            carbs_per_100g: Carbohydrates (g) per 100g.
-            fat_per_100g: Fat (g) per 100g.
-            category: One of the allowed food categories listed above.
+            name: The exercise name.
+            type: "reps" or "duration".
+            category: One of the allowed muscle-group categories listed above.
+            reps: Repetitions performed (for a "reps" exercise).
+            minutes: Minutes performed (for a "duration" exercise).
+            calories_per_rep: Calories (kcal) burned per repetition.
+            calories_per_minute: Calories (kcal) burned per minute.
         """
-
-        print("========= food entry", name, grams, category)
+        print("========= exercise entry", name, type, reps, minutes, category)
         db = SessionLocal()
         try:
-            resolved_category = find_category_by_name(db, category)
+            if type not in ("reps", "duration"):
+                return ToolResponse(
+                    success=False,
+                    result="type must be 'reps' or 'duration'.",
+                )
+
+            if type == "reps" and not reps:
+                return ToolResponse(
+                    success=False,
+                    result="A 'reps' exercise needs a positive `reps` amount.",
+                )
+            if type == "duration" and not minutes:
+                return ToolResponse(
+                    success=False,
+                    result="A 'duration' exercise needs a positive `minutes` amount.",
+                )
+
+            resolved_category = find_exercise_category_by_name(db, category)
             if resolved_category is None:
                 return ToolResponse(
                     success=False,
                     result=(
                         f"Unknown category '{category}'. Choose one of: "
-                        f"{', '.join(DEFAULT_FOOD_CATEGORIES)}."
+                        f"{', '.join(DEFAULT_EXERCISE_CATEGORIES)}."
                     ),
                 )
 
-            product = upsert_product(
+            exercise = upsert_exercise(
                 db,
                 name=name,
-                calories_per_100g=calories_per_100g,
-                protein_per_100g=protein_per_100g,
-                carbs_per_100g=carbs_per_100g,
-                fat_per_100g=fat_per_100g,
-                food_category_id=resolved_category.id,
+                type=type,
+                calories_per_rep=calories_per_rep,
+                calories_per_minute=calories_per_minute,
+                exercise_category=resolved_category.id,
             )
-            entry = create_food_entry(
+            entry = create_exercise_entry(
                 db,
-                product=product,
-                grams=grams,
+                exercise=exercise,
+                type=type,
+                reps=reps,
+                minutes=minutes,
                 created_by=created_by,
             )
             # Running total for today, so the reply can show it alongside the
-            # logged food without relying on a separate tool call.
-            today_totals = get_daily_totals(db, date.today(), created_by)
+            # logged exercise without relying on a separate tool call.
+            today_totals = get_daily_exercise_totals(
+                db, date.today(), created_by)
             return ToolResponse(
                 success=True,
-                result=LoggedFood(
-                    name=product.name,
-                    grams=entry.grams,
-                    category=get_category_name(db, entry.food_category_id),
-                    calories=entry.calories,
-                    protein=entry.protein,
-                    carbs=entry.carbs,
-                    fat=entry.fat,
-                    today_total_calories=today_totals["calories"],
+                result=LoggedExercise(
+                    name=exercise.name,
+                    type=type,
+                    reps=entry.repetition,
+                    minutes=entry.minutes,
+                    category=get_category_name(
+                        db, entry.exercise_category, ExerciseCategory),
+                    calories_burned=entry.calories,
+                    today_total_calories_burned=today_totals["calories"],
                 ),
             )
         except Exception as e:
@@ -320,20 +304,19 @@ def register_exercises_tools(mcp: FastMCP):
             db.close()
 
     @mcp.tool
-    async def get_daily_totals_tool(
+    async def get_exercise_daily_totals(
         created_by: Optional[int] = None,
-    ) -> ToolResponse[dict]:
+    ) -> ToolResponse:
         """
-        Return the user's summed macros (calories, protein, carbs, fat) for
-        TODAY. Use this when the user asks what they ate or how many calories
-        they have had.
+        Return the user's total calories burned for TODAY. Use this when the user
+        asks how much they've exercised or how many calories they've burned.
 
         Takes no arguments — it always reports today's totals for the current
         user. Do NOT pass a date.
         """
         db = SessionLocal()
         try:
-            totals = get_daily_totals(
+            totals = get_daily_exercise_totals(
                 db, datetime.now().date(), created_by=created_by)
             return ToolResponse(success=True, result=totals)
         except Exception as e:

@@ -1,10 +1,10 @@
 from fastmcp import FastMCP
 from import_folder.response import ToolResponse
-import os
-from tavily import TavilyClient
 
 from typing import Optional
 from pydantic import BaseModel
+
+from services.search import search_web
 
 
 class WebSearchResult(BaseModel):
@@ -33,7 +33,7 @@ class WebSearchResponse(BaseModel):
 def register_web_search_tools(mcp: FastMCP):
 
     @mcp.tool
-    async def web_search(user_query: str) -> ToolResponse[WebSearchResponse]:
+    async def web_search(user_query: str) -> ToolResponse:
         """
             Search the internet for current, real-time, or external information.
 
@@ -50,13 +50,12 @@ def register_web_search_tools(mcp: FastMCP):
         print("======= web search start")
 
         try:
-            TAVILY_SEARCH_KEY = os.getenv("TAVILY_SEARCH_KEY")
-            client = TavilyClient(TAVILY_SEARCH_KEY)
-            response = client.search(
-                query=user_query,
-                search_depth="advanced",
-                include_answer="advanced",
-            )
+            response = search_web(user_query)
+            if response is None:
+                return ToolResponse(
+                    success=False,
+                    result="Web search is unavailable right now.",
+                )
 
             result = WebSearchResponse(
                 query=response.get("query", user_query),
