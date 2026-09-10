@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from lmm.factory import get_lmm_provider
 from lmm.usage import TokenUsage
 from repositories.ai_chat_repository import is_model_installed, return_available_models
-from prompts.prompts import tool_calling_prompt, tool_phase_prompt, test_prompt
+from prompts.prompts import tool_phase_prompt, test_prompt
 from schemas import *
 from fastapi.responses import StreamingResponse
 import copy
@@ -166,12 +166,38 @@ def format_provider_error(exc: Exception) -> str:
         return ("The AI provider rejected the request. "
                 "Check the API key or your access to this model.")
 
-    message = getattr(exc, "message", None) or getattr(exc, "error", None) or str(exc)
+    message = getattr(exc, "message", None) or getattr(
+        exc, "error", None) or str(exc)
     # Keep it to the first line so we never dump a stack/JSON blob at the user.
-    lines = [line for line in str(message).strip().splitlines() if line.strip()]
+    lines = [line for line in str(
+        message).strip().splitlines() if line.strip()]
     if lines:
         return f"The AI provider returned an error: {lines[0]}"
     return "Something went wrong contacting the AI provider. Please try again."
+
+
+def to_provider_messages(messages: list[Message]) -> list[dict]:
+    """Convert incoming chat messages into the provider-agnostic dict format the
+    providers consume. `images` is a list of base64 strings (no data-URL prefix).
+
+    Only the single most recent image across the whole history is forwarded:
+    images are expensive in tokens (a vision model expands one into hundreds),
+    so carrying every past attachment would blow the model's context window.
+    Earlier images are dropped and text-only turns are passed through unchanged."""
+    # Index of the last message that carries any image; -1 when there are none.
+    last_image_idx = next(
+        (i for i in range(len(messages) - 1, -1, -1) if messages[i].images),
+        -1,
+    )
+
+    result = []
+    for i, m in enumerate(messages):
+        msg = {"role": m.role, "content": m.content}
+        if i == last_image_idx:
+            # Keep only the last image on that message, in case it had several.
+            msg["images"] = [m.images[-1]]
+        result.append(msg)
+    return result
 
 
 def error_event(message: str) -> str:
@@ -199,8 +225,6 @@ async def chat(body: ChatRequestTest,  user: Session = Depends(check_token)):
     )
 
     print(mentioned_skill, "mentioned ========")
-
-    prompt = tool_calling_prompt.format(user_prompt=last_message)
 
     tool_history = []
 
@@ -278,7 +302,8 @@ async def chat(body: ChatRequestTest,  user: Session = Depends(check_token)):
 
                     seen_calls.add(signature)
 
-                    assistant_message = provider.build_assistant_message(response)
+                    assistant_message = provider.build_assistant_message(
+                        response)
                     messages.append(assistant_message)
                     tool_history.append(assistant_message)
 
@@ -310,7 +335,6 @@ async def chat(body: ChatRequestTest,  user: Session = Depends(check_token)):
         if tool_error:
             yield error_event(tool_error)
             return
-
 
         answer_messages = [{"role": "system", "content": test_prompt}]
 
@@ -349,7 +373,10 @@ async def chat(body: ChatRequestTest,  user: Session = Depends(check_token)):
                 ),
             })
         else:
-            answer_messages.append({"role": "user", "content": prompt})
+            # Forward the full conversation history (with any attached images)
+            # so vision-capable models see them. The JSON output contract is
+            # enforced by `test_prompt` (the system message above).
+            answer_messages.extend(to_provider_messages(user_messages))
 
         try:
             stream = provider.chat(
@@ -370,7 +397,8 @@ async def chat(body: ChatRequestTest,  user: Session = Depends(check_token)):
 
                 if chunk["done"]:
                     if chunk["usage"]:
-                        usage.add(chunk["usage"]["input"], chunk["usage"]["output"])
+                        usage.add(chunk["usage"]["input"],
+                                  chunk["usage"]["output"])
                     print(f"final request usage: {usage.to_dict()}")
                     # Emit the bill as a last event so the client can display it.
                     yield json.dumps({"usage": usage.to_dict(), "done": True}) + "\n"
@@ -412,29 +440,3 @@ def return_models(provider: Optional[str] = None):
         return models
     except Exception as e:
         raise e
-
-
-class DummyChatRequest(BaseModel):
-    prompt: str
-    model: str
-
-
-@router.post("/dummy")
-def dummy_chat(body: DummyChatRequest):
-    """Minimal non-streaming call to the active provider — handy for smoke-testing
-    Gemini (or any provider) end to end without the tool/streaming machinery."""
-    provider = get_lmm_provider()
-
-    response = provider.chat(
-        body.model,
-        [{"role": "user", "content": body.prompt}],
-        stream=False,
-        options=SAMPLING_OPTIONS,
-    )
-
-    # Gemini returns a genai response object; Ollama returns a dict-like message.
-    text = getattr(response, "text", None)
-    if text is None:
-        text = response.get("message", {}).get("content")
-
-    return {"model": body.model, "response": text}

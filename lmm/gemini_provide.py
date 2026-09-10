@@ -1,3 +1,5 @@
+import base64
+
 from google import genai
 from google.genai import types
 
@@ -42,12 +44,47 @@ class GoogleProvider(LMMProvider):
             contents.append(
                 types.Content(
                     role=role,
-                    parts=[types.Part.from_text(text=content)],
+                    parts=self._build_parts(content, message.get("images")),
                 )
             )
 
         system_instruction = "\n\n".join(system_parts) or None
         return contents, system_instruction
+
+    def _build_parts(self, text, images):
+        """Build a message's Gemini parts from its text and any attached images.
+        Images arrive as base64 strings (no data-URL prefix); each becomes an
+        inline image part so vision-capable models can interpret it."""
+        parts = []
+        if text:
+            parts.append(types.Part.from_text(text=text))
+        for b64 in images or []:
+            raw = base64.b64decode(b64)
+            parts.append(
+                types.Part.from_bytes(
+                    data=raw, mime_type=self._guess_image_mime(raw))
+            )
+        # A Content with no parts is invalid; keep an (empty) text part as the
+        # original text-only path did.
+        if not parts:
+            parts.append(types.Part.from_text(text=text or ""))
+        return parts
+
+    @staticmethod
+    def _guess_image_mime(data: bytes) -> str:
+        """Sniff a decoded image's MIME type from its magic bytes. The frontend
+        strips the data-URL prefix, so the declared type is lost, and Gemini
+        requires an explicit mime_type on inline image parts."""
+        if data.startswith(b"\x89PNG\r\n\x1a\n"):
+            return "image/png"
+        if data.startswith(b"\xff\xd8\xff"):
+            return "image/jpeg"
+        if data[:6] in (b"GIF87a", b"GIF89a"):
+            return "image/gif"
+        if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+            return "image/webp"
+        # Fall back to PNG — what the frontend assumes when rendering attachments.
+        return "image/png"
 
     def chat(
         self,
@@ -102,11 +139,35 @@ class GoogleProvider(LMMProvider):
                 "id": m.name.removeprefix("models/"),
                 # Gemini reports thinking support directly on the model listing.
                 "thinking": bool(getattr(m, "thinking", False)),
+                "vision": self._supports_vision(m.name.removeprefix("models/")),
             }
             for m in self.client.models.list()
             if "embed" not in m.name.lower()
             and "generateContent" in (m.supported_actions or [])
         ]
+
+    # Substrings that identify text/audio-only Gemini generateContent models,
+    # i.e. ones that can't interpret images. The listing carries no input-
+    # modality field, so we infer from the model id: every current Gemini
+    # (1.5/2.0/2.5 flash/pro) family is multimodal, so a denylist is more
+    # durable than an allowlist — it degrades to "vision" for unknown future
+    # models rather than silently dropping their image support. Extend this as
+    # Google ships new non-vision variants.
+    _NON_VISION_ID_MARKERS = (
+        "gemini-1.0",  # retired text-only gemini-1.0-pro
+        "-tts",  # text-to-speech
+        "-image-generation",  # image *output*, not interpretation
+    )
+
+    def _supports_vision(self, model_id: str) -> bool:
+        """Best-effort image-input detection for a Gemini model id.
+
+        The API exposes no per-model modality flag, so this is a name-based
+        heuristic: assume the model can interpret images unless its id matches a
+        known text/audio-only marker. Embedding models are already excluded by
+        the `list_models` filter."""
+        lowered = model_id.lower()
+        return not any(marker in lowered for marker in self._NON_VISION_ID_MARKERS)
 
     def is_model_installed(self, model_name: str) -> bool:
         wanted = model_name.removeprefix("models/")

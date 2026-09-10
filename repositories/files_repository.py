@@ -30,6 +30,19 @@ def upload_file_db(filename: string, storageKey: string, size: int, type: string
     return file
 
 
+def delete_file_db(db: Session, file: File):
+    """Delete a file row and its chunks from the DB. Does not touch disk — used
+    to prune an orphaned entry whose backing file is already gone."""
+    try:
+        db.query(Chunk).filter(Chunk.document_id == file.id).delete(
+            synchronize_session=False)
+        db.delete(file)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
 def reset_files_db(db: Session, user_id: int):
     try:
         storage_keys = [

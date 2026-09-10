@@ -8,7 +8,7 @@ from db.schemas.file import File as FileModel
 from errors.user import EmptyPDFFileError, PDFFileSupportedError
 from helpers.helpers import sanitize_input, split_sentences
 from repositories.ai_chat_repository import get_embedding, return_available_embedding_models
-from repositories.files_repository import upload_file_db, reset_files_db, UPLOAD_FOLDER
+from repositories.files_repository import upload_file_db, reset_files_db, delete_file_db, UPLOAD_FOLDER
 from repositories.auth_repository import check_token
 from db.connection import get_db
 from repositories.ai_chat_repository import create_chunk
@@ -155,6 +155,9 @@ async def get_file(id: int, user=Depends(check_token), db: Session = Depends(get
     file_path = os.path.join(UPLOAD_FOLDER, file.storage_key)
 
     if not os.path.exists(file_path):
+        # The backing file is gone, so the DB entry is orphaned — prune it (and
+        # its chunks) before reporting the file as missing.
+        delete_file_db(db, file)
         raise HTTPException(status_code=404, detail="File missing on disk")
 
     return FileResponse(
@@ -162,6 +165,20 @@ async def get_file(id: int, user=Depends(check_token), db: Session = Depends(get
         filename=file.file_name,
         media_type="application/pdf"
     )
+
+
+@router.get("/{id}/exists")
+async def file_exists(id: int, user=Depends(check_token), db: Session = Depends(get_db)):
+    # Lightweight presence probe for the UI (green check / red X). Unlike the
+    # download route it never streams the file and never prunes orphaned rows —
+    # it's a pure read so merely rendering a citation can't mutate anything.
+    file = db.query(FileModel).filter(FileModel.id == id,
+                                      FileModel.created_by == user["user_id"]).first()
+    if not file:
+        return {"exists": False}
+
+    file_path = os.path.join(UPLOAD_FOLDER, file.storage_key)
+    return {"exists": os.path.exists(file_path)}
 
 
 @router.delete("/{id}")

@@ -3,6 +3,9 @@ import json
 from ollama import Client, ResponseError
 from .provider import LMMProvider
 
+DEFAULT_NUM_CTX = 8192
+
+
 class OllamaProvider(LMMProvider):
     def __init__(self, host: str):
         self.client = Client(host)
@@ -17,11 +20,15 @@ class OllamaProvider(LMMProvider):
         thinking=False,
         format=None
     ):
+        # Ensure a context window large enough for image/long-history requests,
+        # while letting an explicit num_ctx from the caller win.
+        merged_options = {"num_ctx": DEFAULT_NUM_CTX, **(options or {})}
+
         kwargs = {
             "model": model,
             "messages": messages,
             "stream": stream,
-            "options": options,
+            "options": merged_options,
             "think": thinking,
             "format": format
         }
@@ -34,26 +41,31 @@ class OllamaProvider(LMMProvider):
     def list_models(self):
         models = self.client.list()
 
-        return [
-            {
-                "name": m["model"],
-                "id": m["model"],
-                "thinking": self._supports_thinking(m["model"]),
-            }
-            for m in models["models"]
-            if "embed" not in m["model"].lower()
-        ]
+        result = []
+        for m in models["models"]:
+            model_name = m["model"]
+            if "embed" in model_name.lower():
+                continue
 
-    def _supports_thinking(self, model_name: str) -> bool:
-        """Ollama only reports capabilities via `show`, not `list`, so this
-        costs one extra call per model. `capabilities` includes "thinking" for
-        models that expose a reasoning channel (e.g. deepseek-r1, qwen3)."""
+            capabilities = self._capabilities(model_name)
+            result.append(
+                {
+                    "name": model_name,
+                    "id": model_name,
+                    "thinking": "thinking" in capabilities,
+                    "vision": "vision" in capabilities,
+                }
+            )
+
+        return result
+
+    def _capabilities(self, model_name: str) -> list:
+
         try:
-            capabilities = self.client.show(model_name).capabilities or []
+            return self.client.show(model_name).capabilities or []
         except ResponseError as e:
             print(e)
-            return False
-        return "thinking" in capabilities
+            return []
 
     def is_model_installed(self, model_name: str) -> bool:
         try:
