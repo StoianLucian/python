@@ -8,6 +8,7 @@ from db.schemas.exercise_category import ExerciseCategory
 from db.schemas.exercise_entry import ExerciseEntry
 from db.schemas.exercises import Exercise
 from repositories.calorie_repository import find_similar
+from repositories.date_ranges import iter_days
 
 
 def find_exercise_category_by_name(
@@ -99,18 +100,79 @@ def create_exercise_entry(
 
 def get_daily_exercise_totals(db: Session, day: date, created_by: int) -> dict:
     """Sum a user's calories burned for a single day."""
-    row = (
+    return get_exercise_totals_in_range(db, day, day, created_by)[0]
+
+
+def get_exercise_totals_in_range(
+    db: Session, start: date, end: date, created_by: int
+) -> list[dict]:
+    """Sum a user's calories burned per day over an inclusive date range
+    [start, end].
+
+    Returns one entry per day ordered chronologically. Days with no entries are
+    zero-filled so the whole range is represented."""
+    day = func.date(ExerciseEntry.created_at)
+    rows = (
         db.query(
+            day.label("day"),
             func.coalesce(func.sum(ExerciseEntry.calories), 0.0),
             func.count(ExerciseEntry.id),
         )
         .filter(ExerciseEntry.created_by == created_by)
-        .filter(ExerciseEntry.created_at == day)
-        .one()
+        .filter(ExerciseEntry.created_at >= start)
+        .filter(ExerciseEntry.created_at <= end)
+        .group_by(day)
+        .order_by(day)
+        .all()
     )
 
-    return {
-        "date": day.isoformat(),
-        "calories": round(row[0], 2),
-        "entries": row[1],
-    }
+    by_day = {}
+    for row in rows:
+        d = row[0] if isinstance(row[0], date) else date.fromisoformat(row[0])
+        by_day[d] = {
+            "calories": round(row[1], 2),
+            "entries": row[2],
+        }
+
+    zero = {"calories": 0.0, "entries": 0}
+    return [
+        {"date": d.isoformat(), **by_day.get(d, zero)}
+        for d in iter_days(start, end)
+    ]
+
+
+def get_daily_exercises(db: Session, day: date, created_by: int) -> list[dict]:
+    """List the individual exercises a user logged on a single day."""
+    return get_exercises_in_range(db, day, day, created_by)
+
+
+def get_exercises_in_range(
+    db: Session, start: date, end: date, created_by: int
+) -> list[dict]:
+    """List the individual exercises a user logged over an inclusive date range
+    [start, end], with the exercise name resolved from the shared catalog.
+
+    Left-joins `exercises` so entries with a null/unknown `exercise_id` are still
+    returned (name is None in that case).
+    """
+    rows = (
+        db.query(ExerciseEntry, Exercise.name)
+        .outerjoin(Exercise, ExerciseEntry.exercise_id == Exercise.id)
+        .filter(ExerciseEntry.created_by == created_by)
+        .filter(ExerciseEntry.created_at >= start)
+        .filter(ExerciseEntry.created_at <= end)
+        .order_by(ExerciseEntry.created_at, ExerciseEntry.id)
+        .all()
+    )
+
+    return [
+        {
+            "id": entry.id,
+            "name": name,
+            "date": entry.created_at.isoformat(),
+            "repetition": entry.repetition,
+            "minutes": entry.minutes,
+            "calories": round(entry.calories, 2),
+        }
+        for entry, name in rows
+    ]

@@ -5,6 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from db.connection import SessionLocal
+from repositories.date_ranges import iter_days
 from db.schemas.food_category import FoodCategory
 from db.schemas.food_entry import FoodEntry
 from db.schemas.food_product import FoodProduct
@@ -114,8 +115,20 @@ def create_food_entry(
 
 def get_daily_totals(db: Session, day: date, created_by: int) -> dict:
     """Sum a user's macros for a single day."""
-    row = (
+    return get_totals_in_range(db, day, day, created_by)[0]
+
+
+def get_totals_in_range(
+    db: Session, start: date, end: date, created_by: int
+) -> List[dict]:
+    """Sum a user's macros per day over an inclusive date range [start, end].
+
+    Returns one entry per day ordered chronologically. Days with no entries are
+    zero-filled so the whole range is represented."""
+    day = func.date(FoodEntry.created_at)
+    rows = (
         db.query(
+            day.label("day"),
             func.coalesce(func.sum(FoodEntry.calories), 0.0),
             func.coalesce(func.sum(FoodEntry.protein), 0.0),
             func.coalesce(func.sum(FoodEntry.carbs), 0.0),
@@ -123,15 +136,61 @@ def get_daily_totals(db: Session, day: date, created_by: int) -> dict:
             func.count(FoodEntry.id),
         )
         .filter(FoodEntry.created_by == created_by)
-        .filter(FoodEntry.created_at == day)
-        .one()
+        .filter(FoodEntry.created_at >= start)
+        .filter(FoodEntry.created_at <= end)
+        .group_by(day)
+        .order_by(day)
+        .all()
     )
 
-    return {
-        "date": day.isoformat(),
-        "calories": round(row[0], 2),
-        "protein": round(row[1], 2),
-        "carbs": round(row[2], 2),
-        "fat": round(row[3], 2),
-        "entries": row[4],
-    }
+    by_day = {}
+    for row in rows:
+        d = row[0] if isinstance(row[0], date) else date.fromisoformat(row[0])
+        by_day[d] = {
+            "calories": round(row[1], 2),
+            "protein": round(row[2], 2),
+            "carbs": round(row[3], 2),
+            "fat": round(row[4], 2),
+            "entries": row[5],
+        }
+
+    zero = {"calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0, "entries": 0}
+    return [
+        {"date": d.isoformat(), **by_day.get(d, zero)}
+        for d in iter_days(start, end)
+    ]
+
+
+def get_foods_in_range(
+    db: Session, start: date, end: date, created_by: int
+) -> list[dict]:
+    """List the individual food entries a user logged over an inclusive date
+    range [start, end], with the product name resolved from the shared catalog.
+
+    Intended for charting, so each entry carries its own macros and date.
+    Left-joins `food_products` so entries with a null/unknown `product_id` are
+    still returned (name is None in that case).
+    """
+    rows = (
+        db.query(FoodEntry, FoodProduct.name)
+        .outerjoin(FoodProduct, FoodEntry.product_id == FoodProduct.id)
+        .filter(FoodEntry.created_by == created_by)
+        .filter(FoodEntry.created_at >= start)
+        .filter(FoodEntry.created_at <= end)
+        .order_by(FoodEntry.created_at, FoodEntry.id)
+        .all()
+    )
+
+    return [
+        {
+            "id": entry.id,
+            "name": name,
+            "date": entry.created_at.isoformat(),
+            "grams": entry.grams,
+            "calories": round(entry.calories, 2),
+            "protein": round(entry.protein, 2),
+            "carbs": round(entry.carbs, 2),
+            "fat": round(entry.fat, 2),
+        }
+        for entry, name in rows
+    ]
