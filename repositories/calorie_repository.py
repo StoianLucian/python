@@ -169,11 +169,13 @@ def get_foods_in_range(
 
     Intended for charting, so each entry carries its own macros and date.
     Left-joins `food_products` so entries with a null/unknown `product_id` are
-    still returned (name is None in that case).
+    still returned (name is None in that case), and `food_categories` so each
+    entry carries its category name (None when uncategorized).
     """
     rows = (
-        db.query(FoodEntry, FoodProduct.name)
+        db.query(FoodEntry, FoodProduct.name, FoodCategory.name)
         .outerjoin(FoodProduct, FoodEntry.product_id == FoodProduct.id)
+        .outerjoin(FoodCategory, FoodEntry.food_category_id == FoodCategory.id)
         .filter(FoodEntry.created_by == created_by)
         .filter(FoodEntry.created_at >= start)
         .filter(FoodEntry.created_at <= end)
@@ -185,6 +187,7 @@ def get_foods_in_range(
         {
             "id": entry.id,
             "name": name,
+            "category": category,
             "date": entry.created_at.isoformat(),
             "grams": entry.grams,
             "calories": round(entry.calories, 2),
@@ -192,5 +195,5 @@ def get_foods_in_range(
             "carbs": round(entry.carbs, 2),
             "fat": round(entry.fat, 2),
         }
-        for entry, name in rows
+        for entry, name, category in rows
     ]
