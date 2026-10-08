@@ -29,6 +29,29 @@ class LMMProvider(ABC):
         """
         pass
 
+    @abstractmethod
+    def stream_turn(self, stream):
+        """Normalize a *streaming* model turn into incremental + terminal events,
+        so a single agentic loop can forward answer tokens live AND still recover
+        any tool calls the model made in the same turn.
+
+        Yields dicts:
+
+            {"content": str | None,
+             "thinking": str | None,
+             "done": bool,
+             "tool_calls": [...] | None,
+             "assistant_message": <native message> | None,
+             "usage": {"input": int, "output": int} | None}
+
+        Incremental events carry ``content``/``thinking`` deltas with
+        ``done=False``. Exactly one terminal event is emitted last with
+        ``done=True`` and carries: ``tool_calls`` (normalized like
+        `parse_tool_calls`, empty when the model called none), the
+        ``assistant_message`` in this provider's native format (append it to the
+        history so the model's calls are preserved), and ``usage``."""
+        pass
+
     # --- Tool calling ----------------------------------------------------
     # The router speaks one generic tool-calling protocol and lets each
     # provider translate to/from its own wire format, so the tool loop stays
@@ -47,6 +70,14 @@ class LMMProvider(ABC):
         """Return tool calls from a non-streaming response, normalized as
         [{"id": str | None, "name": str, "arguments": dict}, ...] (empty when
         the model requested none)."""
+        pass
+
+    @abstractmethod
+    def parse_thinking(self, response):
+        """Return the model's reasoning/thought summary from a non-streaming
+        response as a string, or None when the model emitted none (e.g. a
+        non-thinking model, or thinking was disabled). Used during the tool
+        loop to surface the agent's live reasoning to the client."""
         pass
 
     @abstractmethod

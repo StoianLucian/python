@@ -8,6 +8,7 @@ from skills.user_list.skill import UserListSkill
 from skills.web_search.skill import WebSearchSkill
 from skills.add_calories.skill import CaloriesSkill
 from skills.add_exercise.skill import ExerciseSkill
+from skills.conversation_history.skill import ConversationHistorySkill
 
 AVAILABLE_SKILLS: list[Skill] = [
     EmailSkill(),
@@ -16,5 +17,6 @@ AVAILABLE_SKILLS: list[Skill] = [
     WebSearchSkill(),
     CaloriesSkill(),
     TotalCalorisSkill(),
-    ExerciseSkill()
+    ExerciseSkill(),
+    ConversationHistorySkill(),
 ]

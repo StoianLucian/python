@@ -9,18 +9,6 @@ class ExerciseSkill(Skill):
         "and the amount (repetitions for rep-based exercises, minutes for "
         "duration-based ones)."
     )
-    keywords = [
-        "exercise",
-        "workout",
-        "reps",
-        "repetitions",
-        "pushups",
-        "push-ups",
-        "squats",
-        "running",
-        "cardio",
-        "burned",
-    ]
     trigger = ["/add_exercise"]
     tools = ["lookup_exercise", "add_exercise_entry", "get_exercise_daily_totals"]
 

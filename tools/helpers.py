@@ -8,17 +8,24 @@ def find_skill(query: str):
     # skill modules that (transitively) import this module.
     from skills import AVAILABLE_SKILLS
 
-    # 1. Explicit commands
+    # Match only on a skill's explicit trigger commands.
     for skill in AVAILABLE_SKILLS:
         if any(k in query for k in skill.trigger):
             return skill
 
-    # 2. Keyword matching
-    # query = query.lower()
-    # for skill in AVAILABLE_SKILLS:
-    #     if any(k in query for k in skill.keywords):
-    #         return skill
+    return None
 
+
+def skill_for_tool(tool_name: str):
+    """Return the skill that owns ``tool_name`` (first match), or None.
+
+    Lets the chat loop find a tool's response-format contract even when the tool
+    was chosen by the model rather than via an explicit skill mention."""
+    from skills import AVAILABLE_SKILLS
+
+    for skill in AVAILABLE_SKILLS:
+        if tool_name in skill.tools:
+            return skill
     return None
 
 

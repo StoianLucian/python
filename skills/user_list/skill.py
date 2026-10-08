@@ -5,9 +5,6 @@ from skills.user_list.tools import register_users_tools
 class UserListSkill(Skill):
     name = "user_list"
     description = "Return a list of all users."
-    keywords = [
-        "list of users"
-    ]
     trigger = ["/users_list"]
     tools = ["get_all_users"]
 

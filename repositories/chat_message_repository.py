@@ -30,6 +30,21 @@ def create_message_db(data: CreateMessage, session_id: int, userId: int, db: Ses
         raise
 
 
+def get_recent_messages(session_id: int, created_by, limit: int, db: Session):
+    """Return the most recent `limit` messages of one conversation, oldest-first.
+
+    Scoped to the owning user when `created_by` is provided, so one user can
+    never recall another's conversation. Fetched newest-first with a LIMIT (so
+    long conversations don't load entirely) then reversed to chronological order.
+    """
+    query = db.query(ChatMessage).filter(ChatMessage.session_id == session_id)
+    if created_by is not None:
+        query = query.filter(ChatMessage.created_by == created_by)
+
+    rows = query.order_by(ChatMessage.id.desc()).limit(limit).all()
+    return list(reversed(rows))
+
+
 def create_image_message_db(images: list[str], message_id: str, db: Session):
     try:
         image_objects = [

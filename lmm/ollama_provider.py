@@ -95,6 +95,11 @@ class OllamaProvider(LMMProvider):
             for tc in tool_calls
         ]
 
+    def parse_thinking(self, response):
+        # `think=True` makes Ollama put the reasoning on message.thinking; it's
+        # absent/None otherwise.
+        return getattr(response.message, "thinking", None) or None
+
     def add_usage(self, usage, response):
         usage.add_ollama(response)
 
@@ -135,3 +140,64 @@ class OllamaProvider(LMMProvider):
                 "done": done,
                 "usage": usage,
             }
+
+    def stream_turn(self, stream):
+        # Relay content/thinking deltas live while accumulating the full text and
+        # any tool calls (Ollama delivers tool_calls on a chunk's message, with
+        # the token counts on the final `done` chunk).
+        content_acc = ""
+        tool_calls_raw = []
+        last = None
+
+        for chunk in stream:
+            last = chunk
+            message = chunk.get("message", {})
+
+            content = message.get("content")
+            thinking = message.get("thinking")
+
+            tcs = message.get("tool_calls")
+            if tcs:
+                tool_calls_raw.extend(tcs)
+
+            if content:
+                content_acc += content
+
+            if content or thinking:
+                yield {
+                    "content": content,
+                    "thinking": thinking,
+                    "done": False,
+                    "tool_calls": None,
+                    "assistant_message": None,
+                    "usage": None,
+                }
+
+        usage = {
+            "input": (last.get("prompt_eval_count") if last is not None else 0) or 0,
+            "output": (last.get("eval_count") if last is not None else 0) or 0,
+        }
+
+        tool_calls = [
+            {
+                "id": None,
+                "name": tc.function.name,
+                "arguments": tc.function.arguments or {},
+            }
+            for tc in tool_calls_raw
+        ]
+
+        assistant_message = {"role": "assistant", "content": content_acc}
+        if tool_calls_raw:
+            assistant_message["tool_calls"] = [
+                tc.model_dump() for tc in tool_calls_raw
+            ]
+
+        yield {
+            "content": None,
+            "thinking": None,
+            "done": True,
+            "tool_calls": tool_calls,
+            "assistant_message": assistant_message,
+            "usage": usage,
+        }

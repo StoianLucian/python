@@ -20,7 +20,6 @@ class Skill(ABC):
     description: str
     tools: list[str]
     trigger: list[str]
-    keywords: list[str]
 
     def register(self, mcp):
         """Register the skill's MCP tools.

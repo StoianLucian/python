@@ -7,7 +7,6 @@ from .tools import register_email_tools
 class EmailSkill(Skill):
     name="email"
     description="Send emails to users"
-    keywords=["email", "mail", "gmail", "outlook"]
     tools=["send_email"]
     trigger=['/send_email']
     

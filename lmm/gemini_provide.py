@@ -117,7 +117,10 @@ class GoogleProvider(LMMProvider):
             config["tools"] = tools
 
         if format:
-            config["response_mime_type"] = format
+            # Callers use the generic "json"; Gemini expects a MIME type.
+            config["response_mime_type"] = (
+                "application/json" if format == "json" else format
+            )
 
         kwargs = {
             "model": model,
@@ -203,6 +206,21 @@ class GoogleProvider(LMMProvider):
             for fc in function_calls
         ]
 
+    def parse_thinking(self, response):
+        # Thought summaries arrive as parts flagged `thought=True` (only when
+        # thinking_config.include_thoughts was set on the request).
+        candidates = getattr(response, "candidates", None) or []
+        if not candidates:
+            return None
+
+        parts = getattr(candidates[0].content, "parts", None) or []
+        thoughts = [
+            part.text
+            for part in parts
+            if getattr(part, "thought", False) and getattr(part, "text", None)
+        ]
+        return "".join(thoughts) or None
+
     def add_usage(self, usage, response):
         meta = getattr(response, "usage_metadata", None)
         if meta:
@@ -277,3 +295,69 @@ class GoogleProvider(LMMProvider):
             }
 
         yield {"content": None, "thinking": None, "done": True, "usage": usage}
+
+    def stream_turn(self, stream):
+        # Accumulate every part across chunks so we can rebuild the model turn
+        # (function-call parts + any text) for history, while relaying text and
+        # thought deltas live and collecting the turn's function calls.
+        parts_acc = []
+        tool_calls = []
+        last = None
+
+        for chunk in stream:
+            last = chunk
+
+            candidates = getattr(chunk, "candidates", None) or []
+            if not candidates:
+                continue
+
+            parts = getattr(candidates[0].content, "parts", None) or []
+            content_text = None
+            thinking_text = None
+
+            for part in parts:
+                parts_acc.append(part)
+
+                fc = getattr(part, "function_call", None)
+                if fc:
+                    tool_calls.append({
+                        "id": getattr(fc, "id", None),
+                        "name": fc.name,
+                        "arguments": dict(fc.args or {}),
+                    })
+                    continue
+
+                text = getattr(part, "text", None)
+                if not text:
+                    continue
+                if getattr(part, "thought", False):
+                    thinking_text = (thinking_text or "") + text
+                else:
+                    content_text = (content_text or "") + text
+
+            if content_text or thinking_text:
+                yield {
+                    "content": content_text,
+                    "thinking": thinking_text,
+                    "done": False,
+                    "tool_calls": None,
+                    "assistant_message": None,
+                    "usage": None,
+                }
+
+        usage = None
+        meta = getattr(last, "usage_metadata", None)
+        if meta:
+            usage = {
+                "input": getattr(meta, "prompt_token_count", 0) or 0,
+                "output": getattr(meta, "candidates_token_count", 0) or 0,
+            }
+
+        yield {
+            "content": None,
+            "thinking": None,
+            "done": True,
+            "tool_calls": tool_calls,
+            "assistant_message": types.Content(role="model", parts=parts_acc),
+            "usage": usage,
+        }

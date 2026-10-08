@@ -22,6 +22,8 @@ from sqlalchemy import text  # noqa: E402
 
 with engine.begin() as _conn:
     _conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+    # pgvector: required by the VECTOR columns registered on Base.metadata below.
+    _conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
 
 Base.metadata.create_all(bind=engine)
 
