@@ -5,7 +5,7 @@ from dto.session.session import CreateSession, UpdateSession
 from errors.chat import SummaryNotCreatedError
 
 from repositories.auth_repository import LoginRequest, check_token
-from repositories.chat_session_repository import create_session_db, create_session_summary, delete_session_db, get_user_session_by_id, get_user_sessions, session_summary_prompt, update_session_title_db
+from repositories.chat_session_repository import create_session_db, create_session_summary, delete_session_db, get_user_session_by_id, get_user_sessions, session_summary_prompt, summarize_session, update_session_title_db
 
 router = APIRouter(prefix="/session",
                    tags=["chat session"],
@@ -56,6 +56,26 @@ def delete_session(session_id: int, db: Session = Depends(get_db), user=Depends(
 
         return {"success": True, "message": "Session deleted successfully"}
 
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.post("/{session_id}/summary")
+def create_summary(session_id: int, force: bool = False, db: Session = Depends(get_db), user=Depends(check_token)):
+    """Update the session's rolling summary from its stored conversation.
+
+    The frontend calls this after it has saved both the user turn and the AI
+    response, so the summary reflects the complete conversation. It reads the
+    messages from the DB (no body needed) — the request's own source of truth,
+    summarizes only the new messages into the existing summary, and (re)embeds it
+    for same-session RAG. Safe to call every turn: unless enough new messages
+    have accumulated it skips the model/embedding work and returns the current
+    summary. Pass ?force=true to summarize regardless of the threshold. Call it
+    fire-and-forget from the client so it never blocks the chat UX."""
+    try:
+        summary = summarize_session(session_id, db, force=force)
+        return {"success": True, "summary": summary}
     except Exception:
         db.rollback()
         raise

@@ -33,6 +33,7 @@ def return_context_2(context: str):
 
         stmt = (
             select(Chunk.document_id, Chunk.content, Chunk.page_number)
+            .where(Chunk.source_type == "document")
             .order_by(Chunk.embedding.op("<=>")(embedding))
             .limit(5)
         )
@@ -62,6 +63,7 @@ def return_context(context: str, db: Session):
 
     stmt = (
         select(Chunk.document_id, Chunk.content, Chunk.page_number)
+        .where(Chunk.source_type == "document")
         .order_by(Chunk.embedding.op("<=>")(embedding))
         .limit(10)
     )
@@ -75,6 +77,26 @@ def return_context(context: str, db: Session):
                     "page_number": page_number})
 
     return data
+
+
+def return_session_summary_context(query: str, session_id: int, db: Session):
+    """Retrieve this session's conversation-summary chunk by vector similarity,
+    scoped to the session so same-session recall never pulls in other sessions'
+    summaries or document chunks. There's one summary chunk per session, so this
+    returns at most one row; the vector order_by is kept for when that grows to
+    several topical summary chunks per session."""
+    embedding_models = return_available_embedding_models()
+    embedding = get_embedding(text=query, model=embedding_models[0]["name"])
+
+    stmt = (
+        select(Chunk.content)
+        .where(Chunk.source_type == "conversation_summary")
+        .where(Chunk.session_id == session_id)
+        .order_by(Chunk.embedding.op("<=>")(embedding))
+        .limit(3)
+    )
+
+    return [content for (content,) in db.execute(stmt).all()]
 
 
 def split_sentences(text):

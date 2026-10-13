@@ -15,6 +15,33 @@ User prompt:
 {user_prompt}
 """
 
+conversation_summary_prompt = """
+You are an assistant that maintains a running summary of a conversation between
+a user and an AI assistant.
+
+Do not think step-by-step.
+Answer directly.
+
+You are given the summary so far (it may say "(none)") and the new messages
+since that summary was written. Produce an UPDATED summary of the whole
+conversation that folds the new messages into the existing summary.
+
+Instructions:
+- Preserve the important facts, questions, decisions, and context already in the
+  summary so far — do not drop them just because they are older.
+- Integrate the new messages; merge or drop anything now redundant.
+- Capture the main topics, questions asked, and conclusions or actions taken.
+- Keep it to a short paragraph (3-6 sentences maximum).
+- Write in the third person (e.g. "The user asked about...").
+- Return only the updated summary, with no preamble, quotes, or markdown.
+
+Summary so far:
+{previous_summary}
+
+New messages:
+{conversation}
+"""
+
 rag_prompt = """
 You are a JSON-only API for a Retrieval-Augmented Generation (RAG) system.
 
