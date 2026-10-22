@@ -140,6 +140,40 @@ def summarize_session(session_id: int, db: Session, force: bool = False):
     return summary
 
 
+def conversation_context_for(session_id: int, db: Session, max_recent: int = 10,
+                             max_chars: int = 4000) -> str:
+    """Build the conversation context to feed the agents WITHOUT resending the
+    whole history: the rolling summary (covers everything up to
+    `summary_last_message_id`) plus the handful of newer messages not yet folded
+    into it. Returns a bounded "role: text" block, or "" when there's nothing."""
+    session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    if session is None:
+        return ""
+
+    parts = []
+    if session.summary:
+        parts.append("Summary of earlier conversation:\n" + session.summary)
+
+    covered_id = session.summary_last_message_id or 0
+    recent = (
+        db.query(ChatMessage)
+        .filter(
+            ChatMessage.session_id == session_id,
+            ChatMessage.id > covered_id,
+            ChatMessage.text.isnot(None),
+        )
+        .order_by(ChatMessage.id)
+        .all()
+    )
+    recent = recent[-max_recent:]
+    if recent:
+        lines = "\n".join(f"{m.role}: {m.text}" for m in recent)
+        parts.append("Recent messages:\n" + lines)
+
+    context = "\n\n".join(parts)
+    return context[:max_chars]
+
+
 def get_user_session_by_id(session_id, db: Session):
 
     try:
@@ -193,9 +227,17 @@ def delete_session_db(session_id: int, db: Session):
             ChatSession.id == session_id
         ).first()
 
+        # Remove the session's conversation-summary chunk(s) first — they carry a
+        # FK to chat_sessions (fk_chunks_session_id) with no cascade, so deleting
+        # the session while they exist raises a ForeignKeyViolation.
+        db.query(Chunk).filter(
+            Chunk.session_id == session_id
+        ).delete(synchronize_session=False)
+
         db.delete(session)
         db.commit()
     except Exception as e:
+        db.rollback()
         raise e
 
 

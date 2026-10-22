@@ -1,5 +1,6 @@
 import json
 import re
+import statistics
 from datetime import date, datetime
 from typing import Optional
 
@@ -104,27 +105,67 @@ def _parse_exercise(text: str) -> Optional[dict]:
     }
 
 
+def _aggregate_exercise(candidates: list[dict]) -> Optional[dict]:
+    """Verification step: reduce several per-source extractions to one result.
+    The `type` is a majority vote; the matching burn rate is the MEDIAN across
+    the sources that agreed on that type, so one outlier can't skew it. None if
+    no candidates."""
+    if not candidates:
+        return None
+
+    types = [c["type"] for c in candidates]
+    ex_type = max(set(types), key=types.count)
+    matching = [c for c in candidates if c["type"] == ex_type]
+
+    rate_key = "calories_per_rep" if ex_type == "reps" else "calories_per_minute"
+    values = [c[rate_key] for c in matching if isinstance(c.get(rate_key), (int, float))]
+    if not values:
+        return None
+
+    median = round(statistics.median(values), 3)
+    return {
+        "type": ex_type,
+        "calories_per_rep": median if ex_type == "reps" else None,
+        "calories_per_minute": median if ex_type == "duration" else None,
+    }
+
+
 def _search_exercise_calories(name: str) -> Optional[dict]:
-    """Search the web for an exercise's calorie burn and extract the type plus
-    the matching per-rep / per-minute rate. Returns None if nothing usable."""
+    """Search the web and extract the type + burn rate from up to THREE
+    independent sources, then verify: majority-vote the type and take the median
+    rate across the agreeing sources. Returns None if nothing usable."""
     query = f"{name} calories burned per rep and per minute average adult"
     response = search_web(query)
     if not response:
         return None
 
-    # Prefer Tavily's answer summary (a concise, denser source for the small
-    # extraction model), falling back to the raw result snippets.
-    source = response.get("answer") or response.get("results")
+    # Up to three distinct sources: Tavily's answer summary (when present) plus
+    # the highest-scored result snippets.
+    sources = []
+    if response.get("answer"):
+        sources.append(response["answer"])
+    sources.extend(
+        r["content"] for r in response.get("results", []) if r.get("content"))
+    sources = sources[:3]
 
-    reply = get_lmm_provider().chat(
-        "granite4.1:3b",
-        [
-            {"role": "system", "content": _EXTRACTION_SYSTEM_PROMPT},
-            {"role": "user", "content": f"Exercise: {name}\n\nSource:\n{source}"},
-        ],
-        format=_EXERCISE_FORMAT,
-    )
-    return _parse_exercise(reply.message.content)
+    candidates = []
+    for i, source in enumerate(sources, 1):
+        reply = get_lmm_provider().chat(
+            "granite4.1:3b",
+            [
+                {"role": "system", "content": _EXTRACTION_SYSTEM_PROMPT},
+                {"role": "user", "content": f"Exercise: {name}\n\nSource:\n{source}"},
+            ],
+            format=_EXERCISE_FORMAT,
+        )
+        parsed = _parse_exercise(reply.message.content)
+        print(f"[verify][exercise] {name} source {i}/{len(sources)} -> {parsed}")
+        if parsed:
+            candidates.append(parsed)
+
+    verified = _aggregate_exercise(candidates)
+    print(f"[verify][exercise] {name} verified from {len(candidates)} source(s) -> {verified}")
+    return verified
 
 
 class LoggedExercise(BaseModel):
@@ -143,14 +184,16 @@ def register_exercises_tools(mcp: FastMCP):
     @mcp.tool
     async def lookup_exercise(name: str) -> ToolResponse:
         """
-        Resolve an exercise's calorie-burn rate. Checks the shared catalog first
-        and, on a miss, searches the web for the burn rate automatically.
+        STEP 1 of logging an exercise. Resolve an exercise's calorie-burn rate:
+        checks the shared catalog first and, on a miss, searches the web for the
+        burn rate automatically.
 
-        ALWAYS call this first for each exercise the user mentions. If `found` is
-        true, the returned `type` and rate are ready to use — pass them straight
-        to `add_exercise_entry`. If `found` is false, the rate could not be
-        determined; tell the user you couldn't find data for that exercise and do
-        NOT call `add_exercise_entry` for it.
+        You MUST call this FIRST for each exercise the user mentions, BEFORE
+        `add_exercise_entry` — that tool needs the `type` and rate this returns,
+        and you must never invent them. If `found` is true, pass the returned
+        `type` and rate straight to `add_exercise_entry` (STEP 2). If `found` is
+        false, the rate could not be determined; tell the user you couldn't find
+        data for that exercise and do NOT call `add_exercise_entry` for it.
 
         Args:
             name: The exercise name, e.g. "push-ups", "running".
@@ -209,7 +252,14 @@ def register_exercises_tools(mcp: FastMCP):
         created_by: Optional[int] = None,
     ) -> ToolResponse:
         """
-        Log an exercise the user did and save it to the shared catalog for reuse.
+        STEP 2 of logging an exercise — this is the tool that ACTUALLY logs it.
+        Logging is not complete until this has run successfully.
+
+        Do NOT call this until `lookup_exercise` has returned `found: true` for
+        this exercise; pass the EXACT `type`, `calories_per_rep`/
+        `calories_per_minute` from that result — never invent or guess them. If
+        you don't have a `lookup_exercise` result for this exercise yet, call
+        `lookup_exercise` first.
 
         Pass the `type` and rate returned by `lookup_exercise`. Calories burned
         are computed and returned:

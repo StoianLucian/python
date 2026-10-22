@@ -20,6 +20,10 @@ class Skill(ABC):
     description: str
     tools: list[str]
     trigger: list[str]
+    # When True, this skill's tools are offered to the model ONLY when the user
+    # explicitly invokes the skill (via its trigger) — never in the default
+    # toolset. Use for powerful/general tools the model would otherwise over-call.
+    explicit_only: bool = False
 
     def register(self, mcp):
         """Register the skill's MCP tools.

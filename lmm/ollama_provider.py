@@ -44,10 +44,15 @@ class OllamaProvider(LMMProvider):
         result = []
         for m in models["models"]:
             model_name = m["model"]
-            if "embed" in model_name.lower():
+            # Only text-generating models: skip embedding models and rerankers.
+            if "embed" in model_name.lower() or "rerank" in model_name.lower():
                 continue
 
             capabilities = self._capabilities(model_name)
+            # Rerankers/embedders expose no "completion" capability; keep only
+            # models that can actually generate text.
+            if capabilities and "completion" not in capabilities:
+                continue
             result.append(
                 {
                     "name": model_name,

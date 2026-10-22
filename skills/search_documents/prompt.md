@@ -33,4 +33,8 @@ Examples include:
 - Do not invent information that was not retrieved.
 - If the retrieved information is incomplete, say so.
 - Summarize the retrieved content instead of copying large passages.
-- If appropriate, reference the page number(s) where the information was found.
+- ALWAYS cite your sources: every statement taken from the documents MUST be
+  followed by a `[[source:<source_id>:<page_number>|<short exact quote>]]` marker,
+  using the exact `source_id` and `page_number` from the tool result and a short
+  verbatim snippet from its `content` (one marker per supporting document). This
+  is required, not optional — never answer from the documents without the marker.

@@ -35,13 +35,17 @@ def register_web_search_tools(mcp: FastMCP):
     @mcp.tool
     async def web_search(user_query: str) -> ToolResponse:
         """
-            Search the internet for current, real-time, or external information.
+            Search the public internet for EXTERNAL, current, or real-time
+            information that is NOT in the user's own documents.
 
-            Use this tool whenever the user asks about recent events, news, latest
-            versions or prices, external companies/products/people, or anything that
-            changes over time or may be outside your training data. Returns the most
-            relevant web results (title, url, and a content snippet) to help answer
-            the question.
+            Use this only for recent events, news, latest versions or prices,
+            third-party companies/products/people, or anything that changes over time
+            or is outside both your training data and the user's knowledge base.
+
+            Do NOT use this for the user's own uploaded/indexed content — their files,
+            documents, notes, or images. For that, use `document_search` first; only
+            fall back to web search if the documents do not contain the answer.
+            Returns the most relevant web results (title, url, and a content snippet).
 
             Args:
                 user_query: A concise, keyword-focused search query built from the

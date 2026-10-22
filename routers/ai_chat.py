@@ -28,21 +28,9 @@ mcp = Client(mcp_server)
 
 @router.post("/")
 async def chat(body: ChatRequestTest, user: Session = Depends(check_token)):
-    """Default chat endpoint (orchestrator + specialized sub-agents)."""
-    return await _run_chat_v3(body, user)
-
-
-@router.post("/v3")
-async def chat_v3(body: ChatRequestTest, user: Session = Depends(check_token)):
-    """Orchestrator + specialized sub-agents, each with its own scoped context
-    (see the `agents/` package)."""
-    return await _run_chat_v3(body, user)
-
-
-async def _run_chat_v3(body: ChatRequestTest, user):
-    """Thin entry for the multi-agent path: build the provider, open the MCP
-    client once, and stream the Orchestrator's events. All the control flow lives
-    in `agents.orchestrator.Orchestrator`. Imported lazily to keep this module's
+    """Chat endpoint: builds the provider, opens the in-process MCP client once,
+    and streams the Orchestrator's events (the single tool-calling loop lives in
+    `agents.orchestrator.Orchestrator`). Imported lazily to keep this module's
     import graph independent of `agents/`."""
     from agents.orchestrator import Orchestrator
 
@@ -70,7 +58,7 @@ class PingRequest(BaseModel):
 
 
 @router.post("/ping")
-def chat(body: PingRequest):
+def ping(body: PingRequest):
     model = body.model
 
     try:

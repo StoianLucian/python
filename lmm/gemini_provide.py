@@ -145,7 +145,9 @@ class GoogleProvider(LMMProvider):
                 "vision": self._supports_vision(m.name.removeprefix("models/")),
             }
             for m in self.client.models.list()
+            # Only text-generating models: drop embedders and rerankers.
             if "embed" not in m.name.lower()
+            and "rerank" not in m.name.lower()
             and "generateContent" in (m.supported_actions or [])
         ]
 

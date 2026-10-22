@@ -54,16 +54,26 @@ class NotAuthenticatedError(AppError):
 class PDFFileSupportedError(AppError):
     def __init__(self):
         super().__init__(
-            message="Pdf only supported",
+            # error_code kept stable for the frontend; message widened now that
+            # images are accepted alongside PDFs.
+            message="Only PDF and image (PNG, JPEG, GIF, WebP) files are supported",
             error_code="pdf_type_supported",
             status_code=401
         )
-        
+
 class EmptyPDFFileError(AppError):
     def __init__(self):
         super().__init__(
-            message="PDF file is empty",
+            message="Uploaded file is empty",
             error_code="pdf_file_empty",
+            status_code=400
+        )
+
+class NoVisionModelError(AppError):
+    def __init__(self):
+        super().__init__(
+            message="No vision-capable model is available to describe the image",
+            error_code="no_vision_model",
             status_code=400
         )
         

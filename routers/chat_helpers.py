@@ -44,6 +44,7 @@ USER_SCOPED_TOOLS = {
     "add_exercise_entry",
     "get_exercise_daily_totals",
     "get_conversation_history",
+    "search_documents",
 }
 
 # Tools whose `session_id` must be filled from the current conversation, never

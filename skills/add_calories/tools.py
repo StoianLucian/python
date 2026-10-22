@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import statistics
 from datetime import date, datetime
 from typing import Optional
 
@@ -124,30 +125,59 @@ def _parse_macros(text: str) -> Optional[dict]:
     return macros
 
 
+def _aggregate_macros(candidates: list[dict]) -> Optional[dict]:
+    """Verification step: reduce several per-source extractions to one result by
+    taking the MEDIAN of each macro across sources. The median ignores a single
+    bad source (e.g. per-serving mistaken for per-100g). None if no candidates."""
+    if not candidates:
+        return None
+    agg = {}
+    for key in _MACRO_KEYS:
+        values = [c[key] for c in candidates if isinstance(c.get(key), (int, float))]
+        if not values:
+            return None
+        agg[key] = round(statistics.median(values), 2)
+    return agg
+
+
 def _search_food_macros(name: str) -> Optional[dict]:
-    """Search the web for a food's nutrition facts and extract the four per-100g
-    macros. Extracts from ONE source at a time, highest-scored first, and
-    returns the first result that parses and passes the plausibility check —
-    this avoids asking the model to reconcile several sources that mix per-100g
-    and per-serving numbers. Returns None if no source yields usable macros."""
+    """Search the web and extract the four per-100g macros from up to THREE
+    independent sources, then verify by taking the median of each macro across
+    them (so one off source can't skew the result). Returns None if no source
+    yields usable macros."""
 
     query = f"{name} nutrition facts per 100g calories protein carbs fat"
     response = search_web(query)
     if not response:
         return None
 
-    # Prefer Tavily's answer summary, falling back to the raw result snippets.
-    source = response.get("answer") or response.get("results")
+    # Up to three distinct sources: Tavily's answer summary (when present) plus
+    # the highest-scored result snippets.
+    sources = []
+    if response.get("answer"):
+        sources.append(response["answer"])
+    sources.extend(
+        r["content"] for r in response.get("results", []) if r.get("content"))
+    sources = sources[:3]
 
-    reply = get_lmm_provider().chat(
-        "granite4.1:3b",
-        [
-            {"role": "system", "content": _EXTRACTION_SYSTEM_PROMPT},
-            {"role": "user", "content": f"Food: {name}\n\nSource:\n{source}"},
-        ],
-        format=_MACRO_FORMAT,
-    )
-    return _parse_macros(reply.message.content)
+    candidates = []
+    for i, source in enumerate(sources, 1):
+        reply = get_lmm_provider().chat(
+            "granite4.1:3b",
+            [
+                {"role": "system", "content": _EXTRACTION_SYSTEM_PROMPT},
+                {"role": "user", "content": f"Food: {name}\n\nSource:\n{source}"},
+            ],
+            format=_MACRO_FORMAT,
+        )
+        parsed = _parse_macros(reply.message.content)
+        print(f"[verify][food] {name} source {i}/{len(sources)} -> {parsed}")
+        if parsed:
+            candidates.append(parsed)
+
+    verified = _aggregate_macros(candidates)
+    print(f"[verify][food] {name} verified from {len(candidates)} source(s) -> {verified}")
+    return verified
 
 
 class LoggedFood(BaseModel):
@@ -166,12 +196,14 @@ def register_calorie_tools(mcp: FastMCP):
     @mcp.tool
     async def lookup_product(name: str) -> ToolResponse[ProductLookup]:
         """
-        Resolve a food's macros PER 100g. Checks the shared catalog first and, on
-        a miss, searches the web for the nutrition facts automatically.
+        STEP 1 of logging a food. Resolve a food's macros PER 100g: checks the
+        shared catalog first and, on a miss, searches the web for the nutrition
+        facts automatically.
 
-        ALWAYS call this first for each food the user mentions. If `found` is
-        true, the returned per-100g values are ready to use — pass them straight
-        to `add_food_entry`. If `found` is false, the macros could not be
+        You MUST call this FIRST for each food the user mentions, BEFORE
+        `add_food_entry` — that tool needs these per-100g values and you must
+        never invent them. If `found` is true, pass the per-100g values straight
+        to `add_food_entry` (STEP 2). If `found` is false, the macros could not be
         determined; tell the user you couldn't find nutrition info for that food
         and do NOT call `add_food_entry` for it.
 
@@ -233,7 +265,14 @@ def register_calorie_tools(mcp: FastMCP):
         created_by: Optional[int] = None,
     ) -> ToolResponse[LoggedFood]:
         """
-        Log a food the user ate and save it to the shared catalog for reuse.
+        STEP 2 of logging a food — this is the tool that ACTUALLY logs it.
+        Logging is not complete until this has run successfully; never tell the
+        user a food was "logged" unless this tool returned a result for it.
+
+        Do NOT call this until `lookup_product` has returned `found: true` for
+        this food; pass the EXACT per-100g macros from that result — never invent
+        or guess them. If you don't have a `lookup_product` result for this food
+        yet, call `lookup_product` first.
 
         Only call this when the user has provided a positive amount in grams. If
         the grams are missing or 0, do NOT call this tool — ask the user how many

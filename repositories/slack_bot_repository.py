@@ -1,7 +1,8 @@
 
 import logging
 
-from repositories.ai_chat_repository import initialize_model_generate, return_available_models
+from repositories.ai_chat_repository import initialize_model_generate
+from lmm.factory import get_available_models
 from prompts.prompts import slack_bot_prompt
 from slack_sdk.errors import SlackApiError
 
@@ -9,7 +10,7 @@ from slack_sdk.errors import SlackApiError
 def return_slack_response(slack_message, slack_user: str, history):
 
     try:
-        models = return_available_models()
+        models = get_available_models()
         availableModel = models[0]["id"]
 
         chanel_history = [

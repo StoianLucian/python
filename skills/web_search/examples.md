@@ -1,16 +1,9 @@
-# `/web_search` Response Format
+# Web Search — Response Format
 
-This describes the **final response** returned to the user *after* the
-`web_search` tool has run. It uses the base `text`, `url`, and `error` object
-types.
-
-There are NO sample answers here — only the required shape. Build the answer
-entirely from the `web_search` tool results in the current conversation.
+After calling `web_search`, answer in **Markdown**, built entirely from the tool
+results, and cite the web sources you used as Markdown links.
 
 ## Where the data is in the tool message
-
-The `web_search` tool message has this shape (the useful data is nested under
-`result`):
 
 ```json
 {
@@ -25,54 +18,38 @@ The `web_search` tool message has this shape (the useful data is nested under
 }
 ```
 
-- The answer to give the user is at `result.answer`.
-- The sources to cite are the objects in `result.results` (use their `url` and
-  `title`).
-- If `success` is `true`, there ARE results — read `result.answer` and
-  `result.results`; do not claim the search returned nothing.
+- The answer is at `result.answer` — use it (lightly trimmed). Only if it's
+  empty, write 1–3 sentences yourself from `result.results` snippets.
+- The sources to cite are the objects in `result.results` (use `title` + `url`).
 
 ## Output Format
 
-- Return a JSON array.
-- Emit exactly one `text` object holding the answer:
-  - Use `result.answer` verbatim (or lightly trimmed) as the `text`. Do NOT
-    rewrite it from the raw `result.results`.
-  - Only if `result.answer` is missing or empty, write a one-to-three sentence
-    answer yourself from the `result.results` snippets.
-- Emit one `url` object for each source in `result.results` that you used.
-  - `text`: a short (2–5 word) label for the source, based on its `title`.
-  - `url`: the source `url`, copied verbatim from the tool result.
-- Do not emit `url` objects for results you did not use, and never invent a URL.
-- Every fact you state must come from the tool result. Do not guess.
-- Only return a single `error` object if `success` is `false`, or if both
-  `result.answer` and `result.results` are empty.
+- Write the answer as Markdown prose.
+- Cite each source you used as a Markdown link `[title](url)` — copy the `url`
+  VERBATIM from the tool result; never invent one.
+- Put citations inline after the statement they support, or as a short
+  **Sources** list at the end — whichever reads better.
+- Only cite results you actually used. If `success` is `false` or there is no
+  usable answer, say you couldn't find anything.
 
-## Response shape (structure only — fill from the tool results)
+---
 
-One `text` object with the answer, followed by one `url` object per source you
-used. The `text` object always comes first; add a `url` object for each result
-that has a URL. Replace every `...` below with values from the tool results.
+## Example
 
+Tool result (`web_search`):
 ```json
-[
-  { "type": "text", "text": "<answer, from the tool result `answer` field>" },
-  { "type": "url", "text": "<label for source 1>", "url": "<url of source 1>" },
-  { "type": "url", "text": "<label for source 2>", "url": "<url of source 2>" }
-]
+{
+  "success": true,
+  "result": {
+    "answer": "The latest stable Python release is 3.13, out October 2024.",
+    "results": [
+      { "title": "Python 3.13 release", "url": "https://www.python.org/downloads/release/python-3130/", "content": "..." }
+    ]
+  }
+}
 ```
 
-If the tool results contain no URLs, emit only the `text` object:
-
-```json
-[
-  { "type": "text", "text": "<answer, from the tool result `answer` field>" }
-]
-```
-
-## Error shape (when there is no usable answer)
-
-```json
-[
-  { "type": "error", "text": "..." }
-]
+Response:
+```markdown
+The latest stable Python release is **3.13**, released in October 2024. [Python 3.13 release](https://www.python.org/downloads/release/python-3130/)
 ```

@@ -52,10 +52,24 @@ class Message(BaseModel):
     images: Optional[list[str]] = None
 
 
-def get_embedding(text: str, model):
+def _apply_embedding_prefix(text: str, model: str, task: str) -> str:
+    """EmbeddingGemma requires task-specific prompt prefixes; embedding raw text
+    produces near-random similarities (verified). Apply the retrieval prompts —
+    `query:` for search queries, `text:` for stored documents — only for that
+    model family, so other embedders are unaffected.
+
+    `task` is "query" or "document" (default)."""
+    if "embeddinggemma" in (model or "").lower():
+        if task == "query":
+            return f"task: search result | query: {text}"
+        return f"title: none | text: {text}"
+    return text
+
+
+def get_embedding(text: str, model, task: str = "document"):
     response = client.embeddings(
         model=model,
-        prompt=text
+        prompt=_apply_embedding_prefix(text, model, task),
     )
     return response["embedding"]
 
@@ -91,25 +105,6 @@ def initialize_model_chat(model: str, messages: list[Message], stream: bool, opt
         raise e
 
 
-def return_available_models():
-
-    try:
-        models = client.list()
-
-        model_names = [
-            {
-                "name": m["model"],
-                "id": m["model"]
-            }
-            for m in models["models"]
-            if "embed" not in m["model"].lower()
-        ]
-
-        return model_names
-    except Exception as e:
-        raise e
-
-
 def return_available_embedding_models(provider: str = "ollama"):
     models = get_lmm_provider(provider).client.list()
 
@@ -130,10 +125,11 @@ def return_smallest_model():
     try:
         models = client.list()["models"]
 
-        # Ignore embedding models
+        # Only text-generating models: ignore embedding models and rerankers.
         models = [
             m for m in models
             if "embed" not in m["model"].lower()
+            and "rerank" not in m["model"].lower()
         ]
 
         smallest = min(models, key=lambda m: m["size"])

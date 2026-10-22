@@ -79,7 +79,8 @@ class MLXProvider(LMMProvider):
         result = []
         for m in self.client.models.list().data:
             model_id = m.id
-            if "embed" in model_id.lower():
+            # Only text-generating models: skip embedding models and rerankers.
+            if "embed" in model_id.lower() or "rerank" in model_id.lower():
                 continue
             result.append(
                 {

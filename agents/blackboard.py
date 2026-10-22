@@ -59,13 +59,30 @@ class BlackBoard:
         before the Planner has run."""
         return self.plan[-1] if self.plan else self.user_request
 
+    @property
+    def tools_tried(self) -> list[str]:
+        """Distinct tool names already called this turn, in first-call order. Lets
+        the Planner pick a different tool on a retry and the Evaluator know when
+        every option has been exhausted (→ clarify instead of looping)."""
+        seen: list[str] = []
+        for rec in self.tool_calls:
+            if rec.name not in seen:
+                seen.append(rec.name)
+        return seen
+
     # --- projections: exactly what each role is allowed to see -----------
+
+    def _history_block(self) -> str:
+        return f"Conversation so far:\n{self.history or '(none)'}\n\n"
 
     def planner_view(self) -> str:
         return (
+            f"{self._history_block()}"
             f"User request:\n{self.user_request}\n\n"
             f"Plan so far:\n{self._numbered(self.plan)}\n\n"
             f"Observations so far:\n{self._numbered(self.observations)}\n\n"
+            f"Tools available: {', '.join(self.allowed_tool_names) or '(none)'}\n"
+            f"Tools already tried: {', '.join(self.tools_tried) or '(none)'}\n\n"
             f"Last evaluation: {self.verdict or '(none)'}"
         )
 
@@ -89,7 +106,9 @@ class BlackBoard:
         return (
             f"User request:\n{self.user_request}\n\n"
             f"Plan so far:\n{self._numbered(self.plan)}\n\n"
-            f"Observations so far:\n{self._numbered(self.observations)}"
+            f"Observations so far:\n{self._numbered(self.observations)}\n\n"
+            f"Tools available: {', '.join(self.allowed_tool_names) or '(none)'}\n"
+            f"Tools already tried: {', '.join(self.tools_tried) or '(none)'}"
         )
 
     def answerer_view(self, max_chars: int = 4000) -> str:
@@ -99,6 +118,7 @@ class BlackBoard:
         ]
         results = "\n".join(blocks) or "(no tools were used)"
         return (
+            f"{self._history_block()}"
             f"User request:\n{self.user_request}\n\n"
             f"Observations:\n{self._numbered(self.observations)}\n\n"
             "Raw tool results (use these VERBATIM for any values or citations):\n"
@@ -107,6 +127,7 @@ class BlackBoard:
 
     def clarifier_view(self) -> str:
         return (
+            f"{self._history_block()}"
             f"User request:\n{self.user_request}\n\n"
             f"Observations so far:\n{self._numbered(self.observations)}"
         )
